@@ -25,6 +25,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ExerciseQuestion extends BaseEntity {
     private Integer questionNumber;
+    @Column(columnDefinition = "TEXT")
     private String content;
     @Column(name = "option_a")
     private String optionA;
@@ -39,6 +40,7 @@ public class ExerciseQuestion extends BaseEntity {
     private String optionD;
     @Column(columnDefinition = "CHAR(1)")
     private String correctAnswer; // "A", "B", "C", "D"
+    @Column(columnDefinition = "TEXT")
     private String explanation;
 
     @ManyToOne(fetch = FetchType.LAZY)

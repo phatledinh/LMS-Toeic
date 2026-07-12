@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import org.springframework.security.authentication.BadCredentialsException;
+
 import com.lmstoeic.common.dto.ApiResponse;
 
 @RestControllerAdvice
@@ -37,6 +39,13 @@ public class GlobalExceptionHandler {
                 log.warn("DuplicateResourceException: {}", ex.getMessage());
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                                 .body(ApiResponse.conflict(ex.getMessage()));
+        }
+
+        @ExceptionHandler(BadCredentialsException.class)
+        public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
+                log.warn("BadCredentialsException: {}", ex.getMessage());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(ApiResponse.unauthorized("Email hoặc mật khẩu không chính xác"));
         }
 
         // ========== SPRING MVC EXCEPTIONS ==========

@@ -21,9 +21,6 @@ import lombok.NoArgsConstructor;
 public class Lesson extends BaseEntity {
     private String title;
     private String slug;
-    private String videoUrl;
-    private String docUrl; // đường dẫn file PDF/image
-    private String docFileName; // tên file gốc
     private Integer durationMinutes;
     private Integer orderIndex;
     private Boolean isActive;
