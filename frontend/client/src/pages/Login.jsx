@@ -19,8 +19,8 @@ const Login = () => {
         password
       });
       
-      const { token, fullName, role } = response.data;
-      login(token, { email, fullName, role });
+      const { accessToken, fullName, role } = response.data.data;
+      login(accessToken, { email, fullName, role });
       if (role === 'ADMIN') {
         navigate('/admin/courses');
       } else {

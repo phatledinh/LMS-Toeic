@@ -3,6 +3,26 @@
 export const SERVER_URL = 'http://localhost:8080';
 export const BASE_URL = `${SERVER_URL}/api/v1`;
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+const handleResponse = async (res) => {
+  if (res.status === 401 || res.status === 403) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra');
+  return data;
+};
+
 const delay = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms));
 
 const mockSections = [
@@ -2363,23 +2383,49 @@ export const getExerciseDetailById = async (id) => {
 };
 
 // Flashcards (Decks)
-export const getSystemDecks = async () => { await delay(); return { data: mockDecks.filter(d => d.isSystem) }; };
-export const getDeckById = async (id) => { 
-  await delay(); 
-  const deck = mockDecks.find(d => d.id === Number(id));
-  if (!deck) throw new Error('Not found');
-  return { data: { ...deck, flashcards: mockFlashcards } };
-};
-export const getMyDecks = async () => { await delay(); return { data: mockDecks.filter(d => !d.isSystem) }; };
-export const createMyDeck = async (data) => { await delay(); return { data: { id: Date.now(), ...data } }; };
-export const updateMyDeck = async (id, data) => { await delay(); return { data: { id, ...data } }; };
-export const deleteMyDeck = async (id) => { await delay(); return { data: { success: true } }; };
-export const addFlashCard = async (deckId, data) => { await delay(); return { data: { id: Date.now(), ...data } }; };
-export const updateFlashCard = async (id, data) => { await delay(); return { data: { id, ...data } }; };
-export const deleteFlashCard = async (id) => { await delay(); return { data: { success: true } }; };
+export const getSystemDecks = () =>
+  fetch(`${BASE_URL}/decks/system`, { headers: getAuthHeaders() }).then(handleResponse);
 
-// TTS
-export const getTtsUrl = (text, lang = 'en') => `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(text)}`;
+export const getDeckById = (id) =>
+  fetch(`${BASE_URL}/decks/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const getMyDecks = () =>
+  fetch(`${BASE_URL}/decks/my`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const createMyDeck = (data) =>
+  fetch(`${BASE_URL}/decks/my`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updateMyDeck = (id, data) =>
+  fetch(`${BASE_URL}/decks/my/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deleteMyDeck = (id) =>
+  fetch(`${BASE_URL}/decks/my/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+// ========== FlashCards (within a Deck) ==========
+export const addFlashCard = (deckId, data) =>
+  fetch(`${BASE_URL}/decks/${deckId}/flashcards`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updateFlashCard = (id, data) =>
+  fetch(`${BASE_URL}/flashcards/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deleteFlashCard = (id) =>
+  fetch(`${BASE_URL}/flashcards/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+// ========== TTS (Text-to-Speech) ==========
+export const getTtsUrl = (text, lang = 'en') =>
+  `${BASE_URL}/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
 
 // Practice
 export const getPracticeTopics = async (sectionSlug) => { await delay(); return { data: mockTopics }; };

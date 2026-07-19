@@ -1,6 +1,26 @@
 export const SERVER_URL = 'http://localhost:8080';
 export const BASE_URL = `${SERVER_URL}/api/v1`;
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+const handleResponse = async (res) => {
+  if (res.status === 401 || res.status === 403) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra');
+  return data;
+};
+
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const mockResponse = async (data) => {
   await delay(100);
@@ -157,73 +177,90 @@ export const adminDeleteLesson = async (id) => {
 };
 
 // ========== Decks (Flashcard Lists) ==========
-export const getSystemDecks = () => mockResponse(MOCK_DECKS.filter(d => d.isSystem));
-export const getDeckById = (id) => {
-    let deck = MOCK_DECKS.find(d => d.id == id);
-    if(deck) {
-       deck.flashCards = MOCK_FLASHCARDS.filter(f => f.deckId == id);
-    }
-    return mockResponse(deck);
-};
-export const getMyDecks = () => mockResponse(MOCK_DECKS.filter(d => !d.isSystem));
-export const createMyDeck = async (data) => {
-  MOCK_DECKS.push({ id: Date.now(), isSystem: false, ...data });
-  return mockSuccess();
-};
-export const updateMyDeck = async (id, data) => {
-  MOCK_DECKS = MOCK_DECKS.map(d => d.id == id ? { ...d, ...data } : d);
-  return mockSuccess();
-};
-export const deleteMyDeck = async (id) => {
-  MOCK_DECKS = MOCK_DECKS.filter(d => d.id != id);
-  return mockSuccess();
-};
+export const getSystemDecks = () =>
+  fetch(`${BASE_URL}/decks/system`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const getDeckById = (id) =>
+  fetch(`${BASE_URL}/decks/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const getMyDecks = () =>
+  fetch(`${BASE_URL}/decks/my`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const createMyDeck = (data) =>
+  fetch(`${BASE_URL}/decks/my`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updateMyDeck = (id, data) =>
+  fetch(`${BASE_URL}/decks/my/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deleteMyDeck = (id) =>
+  fetch(`${BASE_URL}/decks/my/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== FlashCards (within a Deck) ==========
-export const addFlashCard = async (deckId, data) => {
-  MOCK_FLASHCARDS.push({ id: Date.now(), deckId, ...data });
-  return mockSuccess();
-};
-export const updateFlashCard = async (id, data) => {
-  MOCK_FLASHCARDS = MOCK_FLASHCARDS.map(f => f.id == id ? { ...f, ...data } : f);
-  return mockSuccess();
-};
-export const deleteFlashCard = async (id) => {
-  MOCK_FLASHCARDS = MOCK_FLASHCARDS.filter(f => f.id != id);
-  return mockSuccess();
-};
+export const addFlashCard = (deckId, data) =>
+  fetch(`${BASE_URL}/decks/${deckId}/flashcards`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const updateFlashCard = (id, data) =>
+  fetch(`${BASE_URL}/flashcards/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const deleteFlashCard = (id) =>
+  fetch(`${BASE_URL}/flashcards/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== TTS (Text-to-Speech) ==========
-export const getTtsUrl = (text, lang = 'en') => `https://mock-tts-url/${lang}/${text}`;
+export const getTtsUrl = (text, lang = 'en') =>
+  `${BASE_URL}/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
 
 // ========== File Upload ==========
-export const uploadFile = async (file, subPath = null, fileName = null) => {
-  return { url: 'https://via.placeholder.com/150' };
+export const uploadFile = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return fetch(`${BASE_URL}/upload`, {
+    method: 'POST',
+    headers: {
+      ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+    },
+    body: formData,
+  }).then(handleResponse);
 };
 
 // ========== Admin: Decks & Flashcards ==========
-export const adminCreateSystemDeck = async (data) => {
-  MOCK_DECKS.push({ id: Date.now(), isSystem: true, ...data });
-  return mockSuccess();
-};
-export const adminUpdateSystemDeck = async (id, data) => {
-  MOCK_DECKS = MOCK_DECKS.map(d => d.id == id ? { ...d, ...data } : d);
-  return mockSuccess();
-};
-export const adminDeleteSystemDeck = async (id) => {
-  MOCK_DECKS = MOCK_DECKS.filter(d => d.id != id);
-  return mockSuccess();
-};
+export const adminCreateSystemDeck = (data) =>
+  fetch(`${BASE_URL}/admin/decks`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
 
-export const adminAddSystemFlashcard = async (deckId, data) => {
-  MOCK_FLASHCARDS.push({ id: Date.now(), deckId, ...data });
-  return mockSuccess();
-};
-export const adminUpdateSystemFlashcard = async (id, data) => {
-  MOCK_FLASHCARDS = MOCK_FLASHCARDS.map(f => f.id == id ? { ...f, ...data } : f);
-  return mockSuccess();
-};
-export const adminDeleteSystemFlashcard = async (id) => {
-  MOCK_FLASHCARDS = MOCK_FLASHCARDS.filter(f => f.id != id);
-  return mockSuccess();
-};
+export const adminUpdateSystemDeck = (id, data) =>
+  fetch(`${BASE_URL}/admin/decks/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteSystemDeck = (id) =>
+  fetch(`${BASE_URL}/admin/decks/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+export const adminAddSystemFlashcard = (deckId, data) =>
+  fetch(`${BASE_URL}/admin/decks/${deckId}/flashcards`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminUpdateSystemFlashcard = (id, data) =>
+  fetch(`${BASE_URL}/admin/flashcards/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteSystemFlashcard = (id) =>
+  fetch(`${BASE_URL}/admin/flashcards/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
