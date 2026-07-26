@@ -48,6 +48,13 @@ public class GlobalExceptionHandler {
                                 .body(ApiResponse.unauthorized("Email hoặc mật khẩu không chính xác"));
         }
 
+        @ExceptionHandler(IllegalArgumentException.class)
+        public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
+                log.warn("IllegalArgumentException: {}", ex.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiResponse.badRequest(ex.getMessage()));
+        }
+
         // ========== SPRING MVC EXCEPTIONS ==========
 
         @ExceptionHandler(MethodArgumentTypeMismatchException.class)

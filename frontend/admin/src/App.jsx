@@ -8,6 +8,7 @@ import AdminQuestionManagePage from './pages/admin/AdminQuestionManagePage';
 import AdminExerciseManagePage from './pages/admin/AdminExerciseManagePage';
 import AdminFlashcardManagePage from './pages/admin/AdminFlashcardManagePage';
 import AdminFlashcardDetailPage from './pages/admin/AdminFlashcardDetailPage';
+import AdminAccountManagePage from './pages/admin/AdminAccountManagePage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminRoute from './components/admin/AdminRoute';
@@ -42,6 +43,7 @@ function AppContent() {
           <Route path="exercises" element={<AdminExerciseManagePage />} />
           <Route path="flashcards" element={<AdminFlashcardManagePage />} />
           <Route path="flashcards/:deckId" element={<AdminFlashcardDetailPage />} />
+          <Route path="accounts" element={<AdminAccountManagePage />} />
           {/* Future admin pages will be nested here */}
         </Route>
       </Routes>

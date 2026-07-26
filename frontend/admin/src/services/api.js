@@ -264,3 +264,29 @@ export const adminDeleteSystemFlashcard = (id) =>
   fetch(`${BASE_URL}/admin/flashcards/${id}`, {
     method: 'DELETE', headers: getAuthHeaders(),
   }).then(handleResponse);
+
+// ========== Admin: Users ==========
+export const adminGetUsers = () =>
+  fetch(`${BASE_URL}/admin/users`, {
+    headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+export const adminCreateUser = (data) =>
+  fetch(`${BASE_URL}/admin/users`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminUpdateUser = (id, data) =>
+  fetch(`${BASE_URL}/admin/users/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminSetUserActive = (id, isActive) =>
+  fetch(`${BASE_URL}/admin/users/${id}/active`, {
+    method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ isActive }),
+  }).then(handleResponse);
+
+export const adminDeleteUser = (id) =>
+  fetch(`${BASE_URL}/admin/users/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);

@@ -31,7 +31,7 @@ const DataTable = ({ columns, data, onEdit, onDelete, customActions = [] }) => {
                   <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {customActions.map((action, idx) => (
                       <button key={idx} onClick={() => action.onClick(row)} style={{ marginRight: '8px', padding: '6px 12px', backgroundColor: action.color || '#2ecc71', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                        {action.label}
+                        {typeof action.label === 'function' ? action.label(row) : action.label}
                       </button>
                     ))}
                     {onEdit && (
