@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { loginApi } from '../services/api';
 import '../index.css';
 
 const Login = () => {
@@ -14,11 +14,19 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      // Mock login always succeeds as ADMIN
-      login('mock-token-123', { email, fullName: 'Admin User', role: 'ADMIN' });
-      navigate('/admin/courses');
+      const response = await loginApi({ email, password });
+      // response.data contains accessToken, fullName, role, etc.
+      const { accessToken, fullName, role } = response.data;
+      
+      login(accessToken, { email, fullName, role });
+      
+      if (role === 'ADMIN') {
+        navigate('/admin/courses');
+      } else {
+        setError('Tài khoản này không có quyền quản trị viên!');
+      }
     } catch (err) {
-      setError('Đăng nhập thất bại. Vui lòng thử lại!');
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
     }
   };
 

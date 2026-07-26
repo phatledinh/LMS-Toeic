@@ -20,9 +20,7 @@ public class FlywayConfig implements BeanFactoryPostProcessor {
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
                 .outOfOrder(true)
-                .cleanDisabled(false)
                 .load();
-        flyway.clean();
         flyway.migrate();
         return flyway;
     }

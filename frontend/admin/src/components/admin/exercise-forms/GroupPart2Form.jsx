@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MediaPreview from './MediaPreview';
-import FileUploadInput from '../../common/FileUploadInput';
+import AudioUploadField from '../../common/AudioUploadField';
 import { getTopicsBySection } from '../../../services/api';
 
 const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectionId, sectionSlug, topicSlug }) => {
@@ -75,7 +75,7 @@ const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
         )}
         <div>
           <label style={styles.label}>Audio URL / Tải audio lên</label>
-          <FileUploadInput name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." accept="audio/*,video/*" fileName={fileNamePrefix ? `${fileNamePrefix}_audio` : null} subPath="exercises/part2/audio" />
+          <AudioUploadField name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." />
         </div>
       </div>
       

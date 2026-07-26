@@ -47,16 +47,16 @@ public class SecurityConfig {
             "/api/v1/auth/refresh",
             "/api/v1/auth/me",
             "/api/v1/auth/logout",
-            "/uploads/**"
+            "/uploads/**",
+            "/media/audio/**"
     };
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000",
-                "http://127.0.0.1:3000", "http://localhost:4173", "http://localhost:5173",
-                "https://yourdomain.com"));
+        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*",
+                "http://127.0.0.1:*", "https://yourdomain.com"));
 
         configuration.setAllowedMethods(
                 Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

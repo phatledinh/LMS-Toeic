@@ -24,6 +24,61 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     out-of-order: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+storage:
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: lms-toeic-media
+    public-prefix: /uploads
+  image:
+    max-size-bytes: 5242880
+    max-width: 1200
+    max-height: 1200
+    output-format: jpg
+    quality: 0.85
+  audio:
+    max-size-bytes: 52428800
+    original-prefix: audio/original
+    processed-prefix: audio/processed
+    target-format: mp3
+    target-content-type: audio/mpeg
+    bitrate: 96k
+    sample-rate: 44100
+    ffmpeg-path: C:/Users/MSII/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1.2-full_build/bin/ffmpeg.exe
+    ffprobe-path: C:/Users/MSII/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.1.2-full_build/bin/ffprobe.exe
+    work-dir: ${java.io.tmpdir}/lms-toeic-audio
+    queue-key: audio-processing:queue
+    max-attempts: 3
+    worker-enabled: true
+    worker-concurrency: 1
+    poll-timeout-seconds: 5
+    processing-timeout-minutes: 10
+    allowed-content-types:
+      - audio/mpeg
+      - audio/mp3
+      - audio/wav
+      - audio/x-wav
+      - audio/mp4
+      - audio/aac
+      - audio/ogg
+      - audio/webm
+    allowed-extensions:
+      - mp3
+      - wav
+      - m4a
+      - aac
+      - ogg
+      - webm
 
 jwt:
     secret: ledinhphatjwtsecretkeyHS256hoidanitjwtsecretkeyHS256hoidanitjwt

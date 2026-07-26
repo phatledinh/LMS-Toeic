@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MediaPreview from './MediaPreview';
 import NestedQuestionList from './NestedQuestionList';
 import FileUploadInput from '../../common/FileUploadInput';
+import AudioUploadField from '../../common/AudioUploadField';
 import { getTopicsBySection } from '../../../services/api';
 
 const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectionId, sectionSlug, topicSlug }) => {
@@ -118,7 +119,7 @@ const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '5px' }}>
         <div>
           <label style={styles.label}>Audio URL / Tải audio lên (*)</label>
-          <FileUploadInput name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." accept="audio/*,video/*" fileName={fileNamePrefix ? `${fileNamePrefix}_audio` : null} subPath="exercises/part34/audio" />
+          <AudioUploadField name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." />
         </div>
         <div>
           <label style={styles.label}>Image URL / Tải ảnh lên (Tùy chọn - Dành cho câu Graphic)</label>
