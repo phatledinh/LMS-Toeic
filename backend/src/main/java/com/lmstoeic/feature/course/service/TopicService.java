@@ -106,7 +106,7 @@ public class TopicService {
                     .map(exercise -> com.lmstoeic.feature.course.dto.ExerciseDto.builder()
                             .id(exercise.getId())
                             .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
-                            .totalQuestions(exercise.getTotalQuestions())
+
                             .orderIndex(exercise.getOrderIndex())
                             .build())
                     .collect(Collectors.toList());

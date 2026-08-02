@@ -98,6 +98,10 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!hasLegacyContent && (!formData.contentBlocks || formData.contentBlocks.length === 0)) {
+      alert("Vui lòng thêm ít nhất một đoạn Text hoặc Hình ảnh cho Nội dung bài đọc.");
+      return;
+    }
     onSave(formData);
   };
 
@@ -109,7 +113,7 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: isPracticeTopic ? '100px 1fr' : '120px', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Nhóm số</label>
+          <label style={styles.label}>Nhóm số <span style={{color: 'red'}}>*</span></label>
           <input type="number" name="orderIndex" value={formData.orderIndex} onChange={handleChange} required style={styles.input} />
         </div>
         {isPracticeTopic && (
@@ -125,17 +129,13 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
         )}
       </div>
 
-      {hasLegacyContent && (
+      {hasLegacyContent && formData.imageUrl && (
         <div style={{ padding: '15px', backgroundColor: '#fff3e0', border: '1px solid #ffcc80', borderRadius: '8px', marginBottom: '15px' }}>
-          <p style={{ color: '#e65100', margin: '0 0 10px 0', fontSize: '0.9rem' }}><i>* Cảnh báo: Nhóm này đang dùng dữ liệu chuẩn cũ. Có thể dùng "Nội dung đa tầng" bên dưới để thay thế.</i></p>
-          <div style={{ marginBottom: '10px' }}>
+          <p style={{ color: '#e65100', margin: '0 0 10px 0', fontSize: '0.9rem' }}><i>* Cảnh báo: Nhóm này đang dùng dữ liệu ảnh cũ. Hãy dùng "Thêm Hình Ảnh" ở phần Content Blocks bên dưới để thay thế.</i></p>
+          <div>
             <label style={styles.label}>Image URL (Cũ)</label>
             <FileUploadInput name="imageUrl" value={formData.imageUrl} onChange={handleChange} accept="image/*" fileName={fileNamePrefix ? `${fileNamePrefix}_img` : null} subPath="exercises/part67/images" />
             <MediaPreview imageUrl={formData.imageUrl} />
-          </div>
-          <div>
-            <label style={styles.label}>Đoạn văn (Cũ)</label>
-            <textarea name="passage" value={formData.passage} onChange={handleChange} rows={4} style={{...styles.input, resize: 'vertical', fontFamily: 'inherit'}} />
           </div>
         </div>
       )}
@@ -187,6 +187,23 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
              Chưa có nội dung nào. Bấm nút <b>+ Thêm Đoạn Text</b> hoặc <b>+ Thêm Hình Ảnh</b> ở trên để tạo nội dung bài đọc.
            </div>
         )}
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{...styles.label, color: '#27ae60'}}>Dịch nghĩa toàn bài (Tùy chọn)</label>
+        {hasLegacyContent && formData.passage && (
+          <p style={{ color: '#e74c3c', margin: '0 0 10px 0', fontSize: '0.9rem' }}>
+            <i>⚠️ Lưu ý: Bài cũ đang lưu Tiếng Anh ở ô này. Hãy copy đoạn này lên "Thêm Đoạn Text" (Content Block) ở trên, sau đó điền bản dịch Tiếng Việt vào đây.</i>
+          </p>
+        )}
+        <textarea 
+          name="passage" 
+          value={formData.passage || ''} 
+          onChange={handleChange} 
+          rows={6} 
+          style={{...styles.input, resize: 'vertical', fontFamily: 'inherit', border: '1px solid #2ecc71'}} 
+          placeholder="Nhập bản dịch tiếng Việt cho toàn bộ bài đọc..." 
+        />
       </div>
 
       <NestedQuestionList 

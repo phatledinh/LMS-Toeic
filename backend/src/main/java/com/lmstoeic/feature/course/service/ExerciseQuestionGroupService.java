@@ -7,9 +7,13 @@ import com.lmstoeic.common.exception.ResourceNotFoundException;
 import com.lmstoeic.feature.course.dto.ExerciseQuestionGroupDto;
 import com.lmstoeic.feature.course.dto.request.QuestionGroupRequest;
 import com.lmstoeic.feature.course.entity.Exercise;
+import com.lmstoeic.feature.course.entity.ExerciseQuestion;
 import com.lmstoeic.feature.course.entity.ExerciseQuestionGroup;
+import com.lmstoeic.feature.course.entity.GroupContentBlock;
+import com.lmstoeic.feature.course.entity.BlockType;
 import com.lmstoeic.feature.course.repository.ExerciseQuestionGroupRepository;
 import com.lmstoeic.feature.course.repository.ExerciseRepository;
+import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +37,40 @@ public class ExerciseQuestionGroupService {
                 .sourceTopicId(request.getSourceTopicId())
                 .exercise(exercise)
                 .build();
+                
+        if (request.getQuestions() != null) {
+            java.util.List<ExerciseQuestion> questions = request.getQuestions().stream().map(qReq -> {
+                ExerciseQuestion q = ExerciseQuestion.builder()
+                        .questionNumber(qReq.getQuestionNumber())
+                        .content(qReq.getContent())
+                        .optionA(qReq.getOptionA())
+                        .optionB(qReq.getOptionB())
+                        .optionC(qReq.getOptionC())
+                        .optionD(qReq.getOptionD())
+                        .correctAnswer(qReq.getCorrectAnswer())
+                        .explanation(qReq.getExplanation())
+                        .sourceTopicId(qReq.getSourceTopicId())
+                        .exercise(exercise)
+                        .group(group)
+                        .build();
+                return q;
+            }).collect(Collectors.toList());
+            group.setQuestions(questions);
+        }
+
+        if (request.getContentBlocks() != null) {
+            java.util.List<GroupContentBlock> blocks = request.getContentBlocks().stream().map(bReq -> {
+                GroupContentBlock b = GroupContentBlock.builder()
+                        .blockType(bReq.getBlockType() != null ? BlockType.valueOf(bReq.getBlockType()) : null)
+                        .content(bReq.getContent())
+                        .imageUrl(bReq.getImageUrl())
+                        .orderIndex(bReq.getOrderIndex())
+                        .group(group)
+                        .build();
+                return b;
+            }).collect(Collectors.toList());
+            group.setContentBlocks(blocks);
+        }
 
         return mapToDto(questionGroupRepository.save(group));
     }
@@ -47,6 +85,50 @@ public class ExerciseQuestionGroupService {
         if (request.getImageUrl() != null) group.setImageUrl(request.getImageUrl());
         if (request.getPassage() != null) group.setPassage(request.getPassage());
         if (request.getSourceTopicId() != null) group.setSourceTopicId(request.getSourceTopicId());
+
+        if (request.getQuestions() != null) {
+            if (group.getQuestions() != null) {
+                group.getQuestions().clear();
+            } else {
+                group.setQuestions(new java.util.ArrayList<>());
+            }
+            java.util.List<ExerciseQuestion> questions = request.getQuestions().stream().map(qReq -> {
+                ExerciseQuestion q = ExerciseQuestion.builder()
+                        .questionNumber(qReq.getQuestionNumber())
+                        .content(qReq.getContent())
+                        .optionA(qReq.getOptionA())
+                        .optionB(qReq.getOptionB())
+                        .optionC(qReq.getOptionC())
+                        .optionD(qReq.getOptionD())
+                        .correctAnswer(qReq.getCorrectAnswer())
+                        .explanation(qReq.getExplanation())
+                        .sourceTopicId(qReq.getSourceTopicId())
+                        .exercise(group.getExercise())
+                        .group(group)
+                        .build();
+                return q;
+            }).collect(Collectors.toList());
+            group.getQuestions().addAll(questions);
+        }
+
+        if (request.getContentBlocks() != null) {
+            if (group.getContentBlocks() != null) {
+                group.getContentBlocks().clear();
+            } else {
+                group.setContentBlocks(new java.util.ArrayList<>());
+            }
+            java.util.List<GroupContentBlock> blocks = request.getContentBlocks().stream().map(bReq -> {
+                GroupContentBlock b = GroupContentBlock.builder()
+                        .blockType(bReq.getBlockType() != null ? BlockType.valueOf(bReq.getBlockType()) : null)
+                        .content(bReq.getContent())
+                        .imageUrl(bReq.getImageUrl())
+                        .orderIndex(bReq.getOrderIndex())
+                        .group(group)
+                        .build();
+                return b;
+            }).collect(Collectors.toList());
+            group.getContentBlocks().addAll(blocks);
+        }
 
         return mapToDto(questionGroupRepository.save(group));
     }

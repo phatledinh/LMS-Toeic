@@ -121,11 +121,7 @@ const SectionPage = () => {
                       <li
                         className="topic-item topic-item--exercise"
                         onClick={() => {
-                          if (topic.slug && topic.slug.includes('luyen-tap-tong-hop')) {
-                            navigate(`/practice/${slug}`);
-                          } else {
-                            navigate(`/exercises/${exercise.id}`);
-                          }
+                          navigate(`/exercises/${exercise.id}`);
                         }}
                       >
                         <span className="topic-item-icon exercise-icon">
@@ -138,9 +134,7 @@ const SectionPage = () => {
                         <span className="topic-item-label">
                           <strong>Luyện tập:</strong> {getExerciseTitle(topic, exercise)}
                         </span>
-                        <span className="topic-item-badge badge--exercise">
-                          {exercise.totalQuestions} câu
-                        </span>
+
                       </li>
                     )}
 

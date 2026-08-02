@@ -51,6 +51,14 @@ const GroupPart1Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.imageUrl) {
+      alert("Vui lòng tải ảnh lên hoặc nhập URL ảnh.");
+      return;
+    }
+    if (!formData.audioUrl) {
+      alert("Vui lòng tải audio lên hoặc nhập URL audio.");
+      return;
+    }
     onSave(formData);
   };
 
@@ -61,7 +69,7 @@ const GroupPart1Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: isPracticeTopic ? '100px 1fr' : '100px', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Câu số</label>
+          <label style={styles.label}>Câu số <span style={{color: 'red'}}>*</span></label>
           <input type="number" name="orderIndex" value={formData.orderIndex} onChange={handleChange} required style={styles.input} />
         </div>
         {isPracticeTopic && (
@@ -79,11 +87,11 @@ const GroupPart1Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '5px' }}>
         <div>
-          <label style={styles.label}>Image URL / Tải ảnh lên</label>
+          <label style={styles.label}>Image URL / Tải ảnh lên <span style={{color: 'red'}}>*</span></label>
           <FileUploadInput name="imageUrl" value={formData.imageUrl} onChange={handleChange} placeholder="https://..." accept="image/*" fileName={fileNamePrefix ? `${fileNamePrefix}_img` : null} subPath="exercises/part1/images" />
         </div>
         <div>
-          <label style={styles.label}>Audio URL / Tải audio lên</label>
+          <label style={styles.label}>Audio URL / Tải audio lên <span style={{color: 'red'}}>*</span></label>
           <AudioUploadField name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." />
         </div>
       </div>
@@ -94,25 +102,25 @@ const GroupPart1Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
         <h4 style={{ margin: '0 0 15px 0', color: '#2c3e50' }}>Chi tiết Câu hỏi</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
           <div>
-            <label style={styles.label}>Đáp án A</label>
+            <label style={styles.label}>Đáp án A <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionA" value={q.optionA} onChange={handleQuestionChange} style={styles.input} required />
           </div>
           <div>
-            <label style={styles.label}>Đáp án B</label>
+            <label style={styles.label}>Đáp án B <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionB" value={q.optionB} onChange={handleQuestionChange} style={styles.input} required />
           </div>
           <div>
-            <label style={styles.label}>Đáp án C</label>
+            <label style={styles.label}>Đáp án C <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionC" value={q.optionC} onChange={handleQuestionChange} style={styles.input} required />
           </div>
           <div>
-            <label style={styles.label}>Đáp án D</label>
+            <label style={styles.label}>Đáp án D <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionD" value={q.optionD} onChange={handleQuestionChange} style={styles.input} required />
           </div>
         </div>
         <div style={{ marginBottom: '15px' }}>
-          <label style={styles.label}>Đáp án Đúng (*)</label>
-          <select name="correctAnswer" value={q.correctAnswer} onChange={handleQuestionChange} style={styles.select}>
+          <label style={styles.label}>Đáp án Đúng <span style={{color: 'red'}}>*</span></label>
+          <select name="correctAnswer" value={q.correctAnswer} onChange={handleQuestionChange} style={styles.select} required>
             <option value="A">A</option>
             <option value="B">B</option>
             <option value="C">C</option>

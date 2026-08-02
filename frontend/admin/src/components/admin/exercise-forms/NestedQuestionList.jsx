@@ -40,12 +40,12 @@ const NestedQuestionList = ({ questions, onChange, onAdd, onRemove }) => {
               <input type="number" placeholder="VD: 1" value={q.questionNumber} onChange={e => onChange(idx, 'questionNumber', e.target.value)} style={styles.input} required />
             </div>
             <div>
-              <label style={styles.label}>Nội dung câu hỏi</label>
+              <label style={styles.label}>Nội dung câu hỏi <span style={{color: 'red'}}>*</span></label>
               <input type="text" placeholder="Nhập câu hỏi..." value={q.content} onChange={e => onChange(idx, 'content', e.target.value)} style={styles.input} required />
             </div>
             <div>
-              <label style={styles.label}>Đáp án đúng</label>
-              <select value={q.correctAnswer} onChange={e => onChange(idx, 'correctAnswer', e.target.value)} style={styles.select}>
+              <label style={styles.label}>Đáp án đúng <span style={{color: 'red'}}>*</span></label>
+              <select value={q.correctAnswer} onChange={e => onChange(idx, 'correctAnswer', e.target.value)} style={styles.select} required>
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>
@@ -56,19 +56,19 @@ const NestedQuestionList = ({ questions, onChange, onAdd, onRemove }) => {
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
             <div>
-              <label style={styles.optionLabel}>A.</label>
+              <label style={styles.optionLabel}>A. <span style={{color: 'red'}}>*</span></label>
               <input type="text" placeholder="Option A" value={q.optionA} onChange={e => onChange(idx, 'optionA', e.target.value)} style={styles.input} required />
             </div>
             <div>
-              <label style={styles.optionLabel}>B.</label>
+              <label style={styles.optionLabel}>B. <span style={{color: 'red'}}>*</span></label>
               <input type="text" placeholder="Option B" value={q.optionB} onChange={e => onChange(idx, 'optionB', e.target.value)} style={styles.input} required />
             </div>
             <div>
-              <label style={styles.optionLabel}>C.</label>
+              <label style={styles.optionLabel}>C. <span style={{color: 'red'}}>*</span></label>
               <input type="text" placeholder="Option C" value={q.optionC} onChange={e => onChange(idx, 'optionC', e.target.value)} style={styles.input} required />
             </div>
             <div>
-              <label style={styles.optionLabel}>D.</label>
+              <label style={styles.optionLabel}>D. <span style={{color: 'red'}}>*</span></label>
               <input type="text" placeholder="Option D" value={q.optionD} onChange={e => onChange(idx, 'optionD', e.target.value)} style={styles.input} required />
             </div>
           </div>

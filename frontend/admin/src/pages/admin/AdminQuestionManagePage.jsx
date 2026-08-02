@@ -122,9 +122,8 @@ const AdminQuestionManagePage = () => {
       </div>
       <div style={{ marginBottom: '20px', padding: '20px', backgroundColor: '#fff', borderLeft: '4px solid #3498db', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
         <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}><b>Loại bài tập:</b> <span style={{ color: '#2980b9' }}>{exercise.exerciseType}</span></p>
-        <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}><b>Tổng số câu:</b> {exercise.totalQuestions}</p>
-        <p style={{ color: '#e74c3c', fontSize: '0.95rem', margin: 0, marginTop: '10px', padding: '10px', backgroundColor: '#fdf3f2', borderRadius: '4px' }}>
-          <i style={{ marginRight: '5px' }}>⚠️</i> <b>Lưu ý:</b> Hệ thống hiện chưa hỗ trợ sửa trực tiếp text câu hỏi/đáp án. Nếu nhập sai, vui lòng Xóa nhóm/câu hỏi đó đi và Tạo lại. Bạn vẫn có thể Sửa thông tin Audio/Image/Passage của nhóm.
+        <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}>
+          <b>Tổng số câu:</b> {isFlatLayout ? (exercise.questions || []).length : (exercise.questionGroups || []).length}
         </p>
       </div>
 

@@ -49,6 +49,10 @@ const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.audioUrl) {
+      alert("Vui lòng tải audio lên hoặc nhập URL audio.");
+      return;
+    }
     onSave(formData);
   };
 
@@ -59,7 +63,7 @@ const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: isPracticeTopic ? '100px 1fr 1fr' : '100px 1fr', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Câu số</label>
+          <label style={styles.label}>Câu số <span style={{color: 'red'}}>*</span></label>
           <input type="number" name="orderIndex" value={formData.orderIndex} onChange={handleChange} required style={styles.input} />
         </div>
         {isPracticeTopic && (
@@ -74,7 +78,7 @@ const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
           </div>
         )}
         <div>
-          <label style={styles.label}>Audio URL / Tải audio lên</label>
+          <label style={styles.label}>Audio URL / Tải audio lên <span style={{color: 'red'}}>*</span></label>
           <AudioUploadField name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." />
         </div>
       </div>
@@ -95,21 +99,21 @@ const GroupPart2Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectio
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
           <div>
-            <label style={styles.label}>Đáp án A</label>
+            <label style={styles.label}>Đáp án A <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionA" value={q.optionA} onChange={handleQuestionChange} style={styles.input} required />
           </div>
           <div>
-            <label style={styles.label}>Đáp án B</label>
+            <label style={styles.label}>Đáp án B <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionB" value={q.optionB} onChange={handleQuestionChange} style={styles.input} required />
           </div>
           <div>
-            <label style={styles.label}>Đáp án C</label>
+            <label style={styles.label}>Đáp án C <span style={{color: 'red'}}>*</span></label>
             <input type="text" name="optionC" value={q.optionC} onChange={handleQuestionChange} style={styles.input} required />
           </div>
         </div>
         <div style={{ marginBottom: '15px' }}>
-          <label style={styles.label}>Đáp án Đúng (*)</label>
-          <select name="correctAnswer" value={q.correctAnswer} onChange={handleQuestionChange} style={styles.select}>
+          <label style={styles.label}>Đáp án Đúng <span style={{color: 'red'}}>*</span></label>
+          <select name="correctAnswer" value={q.correctAnswer} onChange={handleQuestionChange} style={styles.select} required>
             <option value="A">A</option>
             <option value="B">B</option>
             <option value="C">C</option>

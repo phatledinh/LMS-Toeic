@@ -45,7 +45,7 @@ const FlatQuestionForm = ({ initialData, onSave, onCancel, isPracticeTopic, sect
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: isPracticeTopic ? '100px 1fr' : '100px', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Câu số (*)</label>
+          <label style={styles.label}>Câu số <span style={{color: 'red'}}>*</span></label>
           <input type="number" name="questionNumber" value={formData.questionNumber} onChange={handleChange} required style={styles.input} />
         </div>
         {isPracticeTopic && (
@@ -61,30 +61,30 @@ const FlatQuestionForm = ({ initialData, onSave, onCancel, isPracticeTopic, sect
         )}
       </div>
       <div style={{ marginBottom: '15px' }}>
-        <label style={styles.label}>Nội dung câu hỏi</label>
-        <textarea name="content" value={formData.content} onChange={handleChange} rows={3} style={styles.textarea} />
+        <label style={styles.label}>Nội dung câu hỏi <span style={{color: 'red'}}>*</span></label>
+        <textarea name="content" value={formData.content} onChange={handleChange} rows={3} style={styles.textarea} required />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Đáp án A</label>
+          <label style={styles.label}>Đáp án A <span style={{color: 'red'}}>*</span></label>
           <input type="text" name="optionA" value={formData.optionA} onChange={handleChange} style={styles.input} required />
         </div>
         <div>
-          <label style={styles.label}>Đáp án B</label>
+          <label style={styles.label}>Đáp án B <span style={{color: 'red'}}>*</span></label>
           <input type="text" name="optionB" value={formData.optionB} onChange={handleChange} style={styles.input} required />
         </div>
         <div>
-          <label style={styles.label}>Đáp án C</label>
+          <label style={styles.label}>Đáp án C <span style={{color: 'red'}}>*</span></label>
           <input type="text" name="optionC" value={formData.optionC} onChange={handleChange} style={styles.input} required />
         </div>
         <div>
-          <label style={styles.label}>Đáp án D</label>
+          <label style={styles.label}>Đáp án D <span style={{color: 'red'}}>*</span></label>
           <input type="text" name="optionD" value={formData.optionD} onChange={handleChange} style={styles.input} required />
         </div>
       </div>
       <div style={{ marginBottom: '15px' }}>
-        <label style={styles.label}>Đáp án Đúng (*)</label>
-        <select name="correctAnswer" value={formData.correctAnswer} onChange={handleChange} style={styles.select}>
+        <label style={styles.label}>Đáp án Đúng <span style={{color: 'red'}}>*</span></label>
+        <select name="correctAnswer" value={formData.correctAnswer} onChange={handleChange} style={styles.select} required>
           <option value="A">A</option>
           <option value="B">B</option>
           <option value="C">C</option>

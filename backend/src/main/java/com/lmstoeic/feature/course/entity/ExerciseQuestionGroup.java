@@ -39,7 +39,7 @@ public class ExerciseQuestionGroup extends BaseEntity {
     @Column(name = "source_topic_id")
     private Long sourceTopicId;
 
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("questionNumber ASC")
     private List<ExerciseQuestion> questions;
 

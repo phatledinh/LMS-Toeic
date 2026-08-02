@@ -10,8 +10,8 @@ const FlashcardQuizPage = () => {
   const { deck, words, loading, error } = useDeck(listId);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
   const [answered, setAnswered] = useState(false);
+  const [selectedWrongIds, setSelectedWrongIds] = useState([]);
   const [autoNext, setAutoNext] = useState(true);
   const [results, setResults] = useState({});
   const [showResult, setShowResult] = useState(false);
@@ -40,20 +40,29 @@ const FlashcardQuizPage = () => {
 
   const handleSelect = (opt) => {
     if (answered) return;
-    setSelectedId(opt.id);
-    setAnswered(true);
-    setResults({ ...results, [currentIndex]: opt.isCorrect });
+    if (selectedWrongIds.includes(opt.id)) return;
 
-    if (autoNext && opt.isCorrect) {
-      setTimeout(() => goNext(), 1200);
+    if (opt.isCorrect) {
+      setAnswered(true);
+      if (!(currentIndex in results)) {
+        setResults({ ...results, [currentIndex]: true });
+      }
+      if (autoNext) {
+        setTimeout(() => goNext(), 1200);
+      }
+    } else {
+      setSelectedWrongIds([...selectedWrongIds, opt.id]);
+      if (!(currentIndex in results)) {
+        setResults({ ...results, [currentIndex]: false });
+      }
     }
   };
 
   const goNext = () => {
     if (currentIndex < words.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setSelectedId(null);
       setAnswered(false);
+      setSelectedWrongIds([]);
     } else {
       setShowResult(true);
     }
@@ -62,15 +71,15 @@ const FlashcardQuizPage = () => {
   const goPrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
-      setSelectedId(null);
       setAnswered(false);
+      setSelectedWrongIds([]);
     }
   };
 
   const jumpToQuestion = (index) => {
     setCurrentIndex(index);
-    setSelectedId(null);
     setAnswered(false);
+    setSelectedWrongIds([]);
   };
 
   const correctCount = Object.values(results).filter(Boolean).length;
@@ -85,7 +94,7 @@ const FlashcardQuizPage = () => {
             <div className="fc-result-bar-fill" style={{ width: `${(correctCount / words.length) * 100}%` }} />
           </div>
           <div className="fc-result-actions">
-            <button className="quiz-btn btn-outline" onClick={() => { setCurrentIndex(0); setResults({}); setShowResult(false); setSelectedId(null); setAnswered(false); }}>Làm lại</button>
+            <button className="quiz-btn btn-outline" onClick={() => { setCurrentIndex(0); setResults({}); setShowResult(false); setAnswered(false); setSelectedWrongIds([]); }}>Làm lại</button>
             <button className="quiz-btn btn-primary" onClick={() => navigate('/flashcards')}>Quay lại</button>
           </div>
         </div>
@@ -158,9 +167,8 @@ const FlashcardQuizPage = () => {
               <div className="fqp-options">
                 {options.map((opt) => {
                   let cls = 'fqp-option-btn';
-                  if (answered && opt.id === selectedId && opt.isCorrect) cls += ' correct';
-                  else if (answered && opt.id === selectedId && !opt.isCorrect) cls += ' wrong';
-                  else if (answered && opt.isCorrect) cls += ' correct';
+                  if (answered && opt.isCorrect) cls += ' correct';
+                  else if (selectedWrongIds.includes(opt.id)) cls += ' wrong';
 
                   return (
                     <button key={opt.id} className={cls} onClick={() => handleSelect(opt)}>

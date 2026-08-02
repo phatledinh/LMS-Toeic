@@ -17,4 +17,6 @@ public class ExerciseQuestionGroupDto {
     private String passage;
     private Long exerciseId;
     private Long sourceTopicId;
+    private java.util.List<ExerciseQuestionDto> questions;
+    private java.util.List<GroupContentBlockDto> contentBlocks;
 }

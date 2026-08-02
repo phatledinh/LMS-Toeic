@@ -144,7 +144,7 @@ public class SectionService {
         return ExerciseDto.builder()
                 .id(exercise.getId())
                 .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
-                .totalQuestions(exercise.getTotalQuestions())
+
                 .orderIndex(exercise.getOrderIndex())
                 .build();
     }

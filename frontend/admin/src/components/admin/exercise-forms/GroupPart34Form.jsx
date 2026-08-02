@@ -25,9 +25,7 @@ const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
       const qs = initialData.questions && initialData.questions.length > 0 
         ? initialData.questions 
         : [
-            { questionNumber: 1, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' },
-            { questionNumber: 2, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' },
-            { questionNumber: 3, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' }
+            { questionNumber: 1, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' }
           ];
       setFormData({ ...formData, ...initialData, questions: qs, sourceTopicId: initialData.sourceTopicId || '' });
       
@@ -86,6 +84,11 @@ const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    if (!formData.audioUrl) {
+      alert("Vui lòng tải audio lên hoặc nhập URL audio.");
+      return;
+    }
+    
     let builtPassage = '';
     if (transcript || translation) {
       builtPassage = `Transcript\n\n${transcript}\n\n---\n\nDịch nghĩa\n\n${translation}`;
@@ -100,7 +103,7 @@ const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: isPracticeTopic ? '100px 1fr' : '100px', gap: '15px', marginBottom: '15px' }}>
         <div>
-          <label style={styles.label}>Nhóm số</label>
+          <label style={styles.label}>Nhóm số <span style={{color: 'red'}}>*</span></label>
           <input type="number" name="orderIndex" value={formData.orderIndex} onChange={handleChange} required style={styles.input} />
         </div>
         {isPracticeTopic && (
@@ -118,7 +121,7 @@ const GroupPart34Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '5px' }}>
         <div>
-          <label style={styles.label}>Audio URL / Tải audio lên (*)</label>
+          <label style={styles.label}>Audio URL / Tải audio lên <span style={{color: 'red'}}>*</span></label>
           <AudioUploadField name="audioUrl" value={formData.audioUrl} onChange={handleChange} placeholder="https://..." />
         </div>
         <div>

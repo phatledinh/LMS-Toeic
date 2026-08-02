@@ -222,11 +222,13 @@ export const QuestionMCQ = ({ question, answer, showAnswer, onAnswer, hideOption
       {!hideQuestionNumber && question.content && (
         <>
           <div className="question-number">Q{question.questionNumber}:</div>
-          <p className="question-content">{question.content}</p>
+          {question.content !== `(${question.questionNumber})` && (
+            <p className="question-content">{question.content}</p>
+          )}
         </>
       )}
       {!hideQuestionNumber && !question.content && (
-        <div className="question-number">Câu {question.questionNumber}</div>
+        <div className="question-number">Q{question.questionNumber}:</div>
       )}
 
       <div className="options-list">
@@ -976,14 +978,6 @@ const QuizPage = () => {
 
           {/* Toolbar */}
           <div className="quiz-toolbar mock-toolbar">
-            <label className="toggle-switch mock-highlight-toggle">
-              <input type="checkbox" />
-              <span className="toggle-slider"></span>
-              <span className="toggle-label">Highlight</span>
-            </label>
-            <button className="quiz-btn btn-outline mock-toolbar-btn mock-btn-active">
-              Lưu/khôi phục highlight ▾
-            </button>
             <button className="quiz-btn btn-outline mock-toolbar-btn mock-btn-check" onClick={handleCheckAnswer}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -999,19 +993,6 @@ const QuizPage = () => {
               </svg>
               Xoá hết
             </button>
-            {(exerciseType === 'LISTENING_PART1' || exerciseType === 'LISTENING_PART2' || exerciseType === 'LISTENING_PART3' || exerciseType === 'LISTENING_PART4') && (
-              <button
-                className="quiz-btn btn-outline mock-toolbar-btn"
-                onClick={() => navigate(`/exercises/${slug}/dictation`)}
-                style={{ marginLeft: 'auto' }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 20h9"></path>
-                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                </svg>
-                Luyện nghe chép chính tả
-              </button>
-            )}
           </div>
 
           {/* Exercise Content — render theo exerciseType */}
@@ -1045,11 +1026,21 @@ const QuizPage = () => {
             </div>
 
             <div className="question-grid-inner">
-              <div className="question-grid-title" style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px', color: '#333' }}>Danh sách bài tập:</div>
+              <div className="question-grid-title" style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px', color: '#333' }}>
+                {isGrouped ? 'Danh sách đoạn văn:' : 'Danh sách bài tập:'}
+              </div>
               <div className="question-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {allQuestions.map((q, idx) => {
-                  const isCurrent = getQuestionGridStatus(q) === 'current';
-                  const isAnswered = getQuestionGridStatus(q) === 'answered';
+                {(isGrouped ? groups : questions).map((item, idx) => {
+                  let isCurrent = false;
+                  let isAnswered = false;
+                  
+                  if (isGrouped) {
+                    isCurrent = idx === currentIndex;
+                    isAnswered = item.questions?.length > 0 && item.questions.every(q => answers[q.id]);
+                  } else {
+                    isCurrent = getQuestionGridStatus(item) === 'current';
+                    isAnswered = getQuestionGridStatus(item) === 'answered';
+                  }
                   
                   let bgColor = 'white';
                   let textColor = '#333';
@@ -1067,8 +1058,11 @@ const QuizPage = () => {
 
                   return (
                     <button
-                      key={q.id}
-                      onClick={() => handleGridClick(q)}
+                      key={item.id}
+                      onClick={() => {
+                        if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
+                        setCurrentIndex(idx);
+                      }}
                       style={{ 
                         width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         borderRadius: '4px', border: `1px solid ${borderColor}`, background: bgColor,

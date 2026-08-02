@@ -109,6 +109,7 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
       const u = new SpeechSynthesisUtterance(word.word);
       u.lang = 'en-US';
       u.rate = playbackRate;
+      u.volume = isMuted ? 0 : volume;
       u.onend = () => setIsPlaying(false);
       window.speechSynthesis.speak(u);
     }

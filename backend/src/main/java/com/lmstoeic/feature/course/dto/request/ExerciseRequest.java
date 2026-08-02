@@ -18,8 +18,7 @@ public class ExerciseRequest {
     @NotNull(message = "Exercise type is required")
     private ExerciseType exerciseType;
 
-    @Min(value = 0, message = "Total questions must be zero or positive")
-    private Integer totalQuestions;
+
 
     @Min(value = 0, message = "Order index must be zero or positive")
     private Integer orderIndex;

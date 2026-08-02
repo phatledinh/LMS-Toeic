@@ -22,4 +22,7 @@ public class QuestionGroupRequest {
     
     // For when creating through the admin endpoints:
     private Long exerciseId;
+    
+    private java.util.List<QuestionRequest> questions;
+    private java.util.List<GroupContentBlockRequest> contentBlocks;
 }

@@ -31,7 +31,7 @@ public class Exercise extends BaseEntity {
     @Column(name = "exercise_type")
     private ExerciseType exerciseType;
 
-    private Integer totalQuestions;
+
     private Integer orderIndex;
     private Boolean isActive;
 

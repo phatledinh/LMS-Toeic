@@ -105,32 +105,4 @@ export const deleteFlashCard = (id) =>
 export const getTtsUrl = (text, lang = 'en') =>
   `${BASE_URL}/tts?text=${encodeURIComponent(text)}&lang=${lang}`;
 
-// Practice
-export const getPracticeTopics = (sectionSlug) =>
-  fetch(`${BASE_URL}/practice/topics?sectionSlug=${sectionSlug}`, { headers: getAuthHeaders() }).then(handleResponse);
 
-export const getPracticeNextQuestion = (sectionSlug, data) =>
-  fetch(`${BASE_URL}/practice/next-question?sectionSlug=${sectionSlug}`, {
-    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
-
-export const submitPracticeAnswer = (data) =>
-  fetch(`${BASE_URL}/practice/submit`, {
-    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
-  }).then(handleResponse);
-
-export const getPracticeStats = (sectionSlug) =>
-  fetch(`${BASE_URL}/practice/stats?sectionSlug=${sectionSlug}`, { headers: getAuthHeaders() }).then(handleResponse);
-
-export const getPracticeProgress = (sectionSlug, days) =>
-  fetch(`${BASE_URL}/practice/progress?sectionSlug=${sectionSlug}&days=${days}`, { headers: getAuthHeaders() }).then(handleResponse);
-
-export const startPracticeSession = () =>
-  fetch(`${BASE_URL}/practice/session/start`, {
-    method: 'POST', headers: getAuthHeaders(),
-  }).then(handleResponse);
-
-export const endPracticeSession = () =>
-  fetch(`${BASE_URL}/practice/session/end`, {
-    method: 'POST', headers: getAuthHeaders(),
-  }).then(handleResponse);

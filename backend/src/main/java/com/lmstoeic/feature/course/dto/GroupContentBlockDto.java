@@ -9,11 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ExerciseDto {
+public class GroupContentBlockDto {
     private Long id;
-    private String exerciseType;
-
+    private String blockType;
+    private String content;
+    private String imageUrl;
     private Integer orderIndex;
-    private java.util.List<ExerciseQuestionDto> questions;
-    private java.util.List<ExerciseQuestionGroupDto> questionGroups;
 }
