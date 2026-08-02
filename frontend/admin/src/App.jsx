@@ -6,6 +6,7 @@ import AdminLessonPage from './pages/AdminLessonPage';
 import AdminCourseManagePage from './pages/admin/AdminCourseManagePage';
 import AdminQuestionManagePage from './pages/admin/AdminQuestionManagePage';
 import AdminExerciseManagePage from './pages/admin/AdminExerciseManagePage';
+import AdminOnlineTestManagePage from './pages/admin/AdminOnlineTestManagePage';
 import AdminFlashcardManagePage from './pages/admin/AdminFlashcardManagePage';
 import AdminFlashcardDetailPage from './pages/admin/AdminFlashcardDetailPage';
 import AdminAccountManagePage from './pages/admin/AdminAccountManagePage';
@@ -41,6 +42,7 @@ function AppContent() {
           <Route path="exercises/:exerciseId/questions" element={<AdminQuestionManagePage />} />
           <Route path="lessons" element={<AdminLessonPage />} />
           <Route path="exercises" element={<AdminExerciseManagePage />} />
+          <Route path="online-tests" element={<AdminOnlineTestManagePage />} />
           <Route path="flashcards" element={<AdminFlashcardManagePage />} />
           <Route path="flashcards/:deckId" element={<AdminFlashcardDetailPage />} />
           <Route path="accounts" element={<AdminAccountManagePage />} />

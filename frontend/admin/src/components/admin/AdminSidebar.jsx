@@ -22,6 +22,9 @@ const AdminSidebar = () => {
         <li className={location.pathname.startsWith('/admin/exercises') ? 'active' : ''}>
           <Link to="/admin/exercises">Quản lý bài tập</Link>
         </li>
+        <li className={location.pathname.startsWith('/admin/online-tests') ? 'active' : ''}>
+          <Link to="/admin/online-tests">Quản lý đề thi online</Link>
+        </li>
         <li className={location.pathname.startsWith('/admin/flashcards') ? 'active' : ''}>
           <Link to="/admin/flashcards">Quản lý từ vựng</Link>
         </li>

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import { getExerciseDetailById } from '../services/api';
 import { getFullUrl } from '../utils/urlUtils';
-import Header from '../components/Header';
+import { useAuth } from '../context/AuthContext';
 
 // ==================== Sub-components ====================
 
@@ -718,16 +718,19 @@ export const ReadingPassageLayout = ({ groups, currentGroupIndex, answers, showA
 const QuizPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [exercise, setExercise] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0); // cho GRAMMAR/PART5: index câu hỏi; cho grouped: index group
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [showAnswer, setShowAnswer] = useState(false);
   const [autoNext, setAutoNext] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [remainingSeconds, setRemainingSeconds] = useState(120 * 60);
+  const [submitNotice, setSubmitNotice] = useState('');
+  const [loadError, setLoadError] = useState('');
   const autoNextTimeoutRef = useRef(null);
 
-  // Clear timeout on unmount
   useEffect(() => {
     return () => {
       if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
@@ -735,79 +738,73 @@ const QuizPage = () => {
   }, []);
 
   useEffect(() => {
+    const timer = setInterval(() => {
+      setRemainingSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
+    setLoadError('');
     getExerciseDetailById(slug)
       .then((res) => {
         setExercise(res.data);
         setCurrentIndex(0);
         setAnswers({});
         setShowAnswer(false);
+        setSubmitNotice('');
+        setRemainingSeconds(120 * 60);
       })
-      .catch(() => navigate(-1))
+      .catch(() => {
+        setExercise(null);
+        setLoadError('Không thể tải đề thi. Hãy khởi động lại backend rồi thử lại.');
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Khôi phục trạng thái đáp án khi chuyển sang câu khác
   useEffect(() => {
     setShowAnswer(false);
   }, [currentIndex]);
 
-  // Xác định loại exercise
   const exerciseType = exercise?.exerciseType || 'GRAMMAR';
   const isGrouped = exerciseType !== 'GRAMMAR' && exerciseType !== 'READING_PART5';
-
-  // Dữ liệu câu hỏi
   const questions = exercise?.questions || [];
   const groups = exercise?.questionGroups || [];
 
-  // Tất cả câu hỏi (flatten) — dùng cho sidebar, grid, đếm
   const allQuestions = useMemo(() => {
     if (!isGrouped) return questions;
-    return groups.flatMap(g => g.questions || []);
+    return groups.flatMap((group) => group.questions || []);
   }, [isGrouped, questions, groups]);
 
-  // Số lượng item để navigate (câu hỏi hoặc group)
   const totalItems = isGrouped ? groups.length : questions.length;
-  const currentItem = isGrouped ? groups[currentIndex] : questions[currentIndex];
 
   const handleAnswer = useCallback((questionId, option) => {
-    // Ngăn chặn sự kiện click kép (do label bọc radio input kích hoạt cả onChange và onClick)
     if (answers[questionId] === option) return;
-
-    if (autoNextTimeoutRef.current) {
-      clearTimeout(autoNextTimeoutRef.current);
-    }
+    if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
 
     const newAnswers = { ...answers, [questionId]: option };
     setAnswers(newAnswers);
+    setSubmitNotice('');
 
-    // Auto-next logic
     if (autoNext) {
       if (!isGrouped) {
-        const q = questions.find(qq => qq.id === questionId);
-        if (q) {
+        const question = questions.find((item) => item.id === questionId);
+        if (question) {
           setShowAnswer(true);
-          if (option === q.correctAnswer) {
-            if (currentIndex < totalItems - 1) {
-              autoNextTimeoutRef.current = setTimeout(() => {
-                setCurrentIndex((i) => i + 1);
-              }, 1500); // Đợi 1.5s
-            }
+          if (option === question.correctAnswer && currentIndex < totalItems - 1) {
+            autoNextTimeoutRef.current = setTimeout(() => setCurrentIndex((index) => index + 1), 1500);
           }
         }
       } else {
         const currentGroup = groups[currentIndex];
-        if (currentGroup && currentGroup.questions) {
-          const isAllAnswered = currentGroup.questions.every(gq => newAnswers[gq.id]);
+        if (currentGroup?.questions) {
+          const isAllAnswered = currentGroup.questions.every((question) => newAnswers[question.id]);
           if (isAllAnswered) {
             setShowAnswer(true);
-            const allCorrect = currentGroup.questions.every(gq => newAnswers[gq.id] === gq.correctAnswer);
-            if (allCorrect) {
-              if (currentIndex < totalItems - 1) {
-                autoNextTimeoutRef.current = setTimeout(() => {
-                  setCurrentIndex((i) => i + 1);
-                }, 1500);
-              }
+            const allCorrect = currentGroup.questions.every((question) => newAnswers[question.id] === question.correctAnswer);
+            if (allCorrect && currentIndex < totalItems - 1) {
+              autoNextTimeoutRef.current = setTimeout(() => setCurrentIndex((index) => index + 1), 1500);
             }
           }
         }
@@ -817,81 +814,82 @@ const QuizPage = () => {
 
   const handlePrev = () => {
     if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
-    setCurrentIndex((i) => Math.max(0, i - 1));
+    setCurrentIndex((index) => Math.max(0, index - 1));
   };
+
   const handleNext = () => {
     if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
-    setCurrentIndex((i) => Math.min(totalItems - 1, i + 1));
+    setCurrentIndex((index) => Math.min(totalItems - 1, index + 1));
   };
+
   const handleCheckAnswer = () => setShowAnswer(true);
-  const handleClear = () => { 
+
+  const handleClear = () => {
     if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
-    setAnswers({}); 
-    setShowAnswer(false); 
+    setAnswers({});
+    setShowAnswer(false);
+    setSubmitNotice('');
   };
 
-  // Sidebar: item status
-  const getItemStatus = (idx) => {
-    if (idx === currentIndex) return 'active';
-    if (isGrouped) {
-      const g = groups[idx];
-      const allAnswered = g?.questions?.every(q => answers[q.id]);
-      return allAnswered ? 'done' : '';
-    } else {
-      const q = questions[idx];
-      return q && answers[q.id] ? 'done' : '';
-    }
-  };
-
-  // Sidebar label
   const getItemLabel = (idx) => {
     if (isGrouped) {
-      const g = groups[idx];
-      const qNums = g?.questions?.map(q => q.questionNumber);
-      if (!qNums || qNums.length === 0) return `Nhóm ${idx + 1}`;
-      if (qNums.length === 1) return `Câu ${qNums[0]}`;
-      return `Câu ${qNums[0]}–${qNums[qNums.length - 1]}`;
+      const group = groups[idx];
+      const questionNumbers = group?.questions?.map((question) => question.questionNumber);
+      if (!questionNumbers || questionNumbers.length === 0) return 'Nhóm ' + (idx + 1);
+      if (questionNumbers.length === 1) return 'Câu ' + questionNumbers[0];
+      return 'Câu ' + questionNumbers[0] + '-' + questionNumbers[questionNumbers.length - 1];
     }
-    return `Câu ${questions[idx]?.questionNumber || idx + 1}`;
+    return 'Câu ' + (questions[idx]?.questionNumber || idx + 1);
   };
 
-  // Question grid status (flat, cho tất cả câu hỏi)
-  const getQuestionGridStatus = (q) => {
-    if (!q) return '';
-    // Tìm xem câu này thuộc group/index nào đang active
+  const getQuestionGridStatus = (question) => {
+    if (!question) return '';
     if (isGrouped) {
-      const gIdx = groups.findIndex(g => g.questions?.some(gq => gq.id === q.id));
-      if (gIdx === currentIndex) return 'current';
+      const groupIndex = groups.findIndex((group) => group.questions?.some((item) => item.id === question.id));
+      if (groupIndex === currentIndex) return 'current';
     } else {
-      const qIdx = questions.findIndex(qq => qq.id === q.id);
-      if (qIdx === currentIndex) return 'current';
+      const questionIndex = questions.findIndex((item) => item.id === question.id);
+      if (questionIndex === currentIndex) return 'current';
     }
-    if (answers[q.id]) return 'answered';
+    if (answers[question.id]) return 'answered';
     return '';
   };
 
-  // Click vào question grid → navigate đến đúng group/question
-  const handleGridClick = (q) => {
+  const handleGridClick = (question) => {
     if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     if (isGrouped) {
-      const gIdx = groups.findIndex(g => g.questions?.some(gq => gq.id === q.id));
-      if (gIdx >= 0) setCurrentIndex(gIdx);
+      const groupIndex = groups.findIndex((group) => group.questions?.some((item) => item.id === question.id));
+      if (groupIndex >= 0) setCurrentIndex(groupIndex);
     } else {
-      const qIdx = questions.findIndex(qq => qq.id === q.id);
-      if (qIdx >= 0) setCurrentIndex(qIdx);
+      const questionIndex = questions.findIndex((item) => item.id === question.id);
+      if (questionIndex >= 0) setCurrentIndex(questionIndex);
     }
   };
 
   if (loading) return (
-    <div className="quiz-loading">
+    <div className="quiz-loading zen-quiz-loading">
       <div className="spinner"></div>
-      <p>Đang tải bài tập...</p>
+      <p>Đang tải đề thi...</p>
     </div>
+  );
+
+  if (loadError) return (
+    <main className="online-tests-page">
+      <div className="online-tests-error">
+        {loadError}
+      </div>
+      <section className="online-tests-toolbar">
+        <div>
+          <strong>Đề thi chưa tải được</strong>
+          <span>Backend cần chạy phiên bản mới có API /api/v1/exercises/:id.</span>
+        </div>
+        <button onClick={() => navigate('/online-tests')}>Quay lại danh sách đề</button>
+      </section>
+    </main>
   );
 
   if (!exercise) return null;
 
-  // Render layout phù hợp
   const renderExerciseContent = () => {
     switch (exerciseType) {
       case 'LISTENING_PART1':
@@ -914,205 +912,157 @@ const QuizPage = () => {
   const getExerciseTitle = () => {
     if (exercise.topicSlug === 'topic-part6-luyen-tap-hinh-thuc-van-ban') {
       const mapping = {
-        1: 'Thư điện tử/ thư tay (Email/ Letter)',
-        2: 'Bài báo (Article/ Review)',
-        3: 'Quảng cáo (Advertisement)',
-        4: 'Thông báo/ văn bản hướng dẫn (Notice/ Announcement Information)',
-        5: 'Thông báo nội bộ (Memo)'
+        1: 'Thư điện tử / thư tay',
+        2: 'Bài báo / bài đánh giá',
+        3: 'Quảng cáo',
+        4: 'Thông báo / hướng dẫn',
+        5: 'Thông báo nội bộ'
       };
       if (mapping[exercise.orderIndex]) return mapping[exercise.orderIndex];
     }
     return 'Trắc nghiệm format TOEIC';
   };
 
+  const answeredCount = allQuestions.filter((question) => answers[question.id]).length;
+  const progressPercent = allQuestions.length > 0 ? Math.round((answeredCount / allQuestions.length) * 100) : 0;
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  const timeText = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+  const currentQuestionLabel = getItemLabel(currentIndex);
+  const partName = exercise.topicName || exercise.title || 'Đề thi TOEIC online';
+  const exerciseTypeLabel = exerciseType.replaceAll('_', ' ');
+
+  const handleSubmit = () => {
+    setShowAnswer(true);
+    setSubmitNotice('Đã ghi nhận ' + answeredCount + '/' + allQuestions.length + ' câu trả lời. Bạn có thể xem đáp án hoặc làm lại bài.');
+  };
+
   return (
-    <div className="quiz-layout">
-      <Header />
-      <div className="quiz-body">
-        {/* Sidebar trái */}
-        <aside className={`quiz-sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
-          <div className="quiz-sidebar-header" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ backgroundColor: '#3b5998', color: 'white', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: 'none' }}>
-            <span style={{ fontWeight: '600', fontSize: '15px' }}>{exercise.topicName || 'Luyện tập'}</span>
+    <div className="quiz-layout zen-exam-layout">
+      <div className="zen-exam-topbar">
+        <div className="zen-exam-brand">
+          <span className="zen-exam-mark">TOEIC</span>
+          <div>
+            <p>Hệ thống thi trực tuyến</p>
+            <strong>{partName}</strong>
+          </div>
+        </div>
+        <div className="zen-exam-actions">
+          <button className="zen-action primary" onClick={handleSubmit}>Nộp bài</button>
+          <button className="zen-action" onClick={handleClear}>Làm lại</button>
+          <button className="zen-action subtle" onClick={() => navigate(-1)}>Thoát</button>
+        </div>
+      </div>
+
+      <div className="zen-exam-status">
+        <div className="zen-status-card timer">
+          <span>Thời gian còn lại</span>
+          <strong>{timeText}</strong>
+        </div>
+        <div className="zen-status-card">
+          <span>Thí sinh</span>
+          <strong>{user?.fullName || 'Guest (khách)'}</strong>
+        </div>
+        <div className="zen-status-card">
+          <span>Tiến độ</span>
+          <strong>{answeredCount}/{allQuestions.length} câu</strong>
+        </div>
+        <div className="zen-status-progress" aria-label={'Đã làm ' + progressPercent + '%'}>
+          <span style={{ width: progressPercent + '%' }}></span>
+        </div>
+      </div>
+
+      <div className="quiz-body zen-exam-body">
+        <aside className={'quiz-sidebar zen-exam-sidebar ' + (sidebarOpen ? 'open' : 'collapsed')}>
+          <button className="zen-sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            <span>{sidebarOpen ? 'Ẩn bảng câu hỏi' : 'Hiện'}</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d={sidebarOpen ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'} />
             </svg>
-          </div>
+          </button>
+
           {sidebarOpen && (
-            <div className="quiz-sidebar-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="sidebar-menu-items" style={{ padding: '0' }}>
-                <div className="sidebar-item" style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-                  <span><strong>Video bài giảng:</strong> Lý thuyết</span>
+            <div className="zen-sidebar-content">
+              <div className="zen-part-card">
+                <span>Đề thi online</span>
+                <strong>{exerciseTypeLabel}</strong>
+                <p>{currentQuestionLabel}</p>
+              </div>
+
+              <div className="zen-note">
+                <strong>Lưu ý</strong>
+                <p>Hãy dùng Google Chrome khi làm bài. Nếu đáp án không hiển thị đúng, bấm Ctrl + F5 để tải lại.</p>
+              </div>
+
+              <div className="zen-question-map">
+                <div className="zen-map-title">Câu hỏi</div>
+                <div className="question-grid zen-grid">
+                  {allQuestions.map((question, index) => (
+                    <button
+                      key={question.id}
+                      className={'grid-btn ' + getQuestionGridStatus(question)}
+                      onClick={() => handleGridClick(question)}
+                      aria-label={'Đi tới câu ' + (index + 1)}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
                 </div>
-                <div className="sidebar-item active" style={{ padding: '16px', backgroundColor: '#e8f0fe', borderLeft: '4px solid #3b5998', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
-                  <span><strong>Luyện tập:</strong> {getExerciseTitle()}</span>
-                </div>
-                <div className="sidebar-item" style={{ padding: '16px', borderBottom: '1px solid #eee', color: '#666', cursor: 'pointer' }} onClick={() => navigate(exercise.sectionSlug ? `/course/${exercise.sectionSlug}` : -1)}>
-                  ← Quay lại chương trình học
-                </div>
-                
-                {exercise.nextTopicName && (
-                  <div className="sidebar-next-lesson" style={{ padding: '24px 16px' }}>
-                    <div style={{ color: '#666', marginBottom: '12px' }}>Bài học tiếp theo:</div>
-                    <div style={{ cursor: 'pointer', fontWeight: '500', paddingLeft: '16px', color: '#1a1a1a' }} onClick={() => navigate(`/topics/${exercise.nextTopicSlug}`)}>
-                      {exercise.nextTopicName}
-                    </div>
-                  </div>
-                )}
+              </div>
+
+              <div className="zen-map-legend">
+                <span><i className="legend-current"></i>Đang làm</span>
+                <span><i className="legend-answered"></i>Đã chọn</span>
+                <span><i></i>Chưa làm</span>
               </div>
             </div>
           )}
         </aside>
 
-        {/* Vùng nội dung chính */}
-        <div className="quiz-main">
-          {/* Breadcrumb */}
-          <div className="quiz-breadcrumb">
-            <span className="bc-link" onClick={() => navigate(-1)}>← Quay lại</span>
-            <span className="bc-sep"> / </span>
-            <span>Luyện tập: {exercise.exerciseType}</span>
-          </div>
+        <main className="quiz-main zen-exam-main">
+          <section className="zen-exam-intro">
+            <div>
+              <button className="zen-back-link" onClick={() => navigate(-1)}>← Quay lại</button>
+              <h1>Đề thi online</h1>
+              <p>{getExerciseTitle()} • {allQuestions.length} câu • {exerciseTypeLabel}</p>
+            </div>
+            <div className="zen-current-chip">{currentQuestionLabel}</div>
+          </section>
 
-          {/* Toolbar */}
-          <div className="quiz-toolbar mock-toolbar">
-            <label className="toggle-switch mock-highlight-toggle">
-              <input type="checkbox" />
+          {submitNotice && <div className="zen-submit-notice">{submitNotice}</div>}
+
+          <div className="quiz-toolbar mock-toolbar zen-exam-toolbar">
+            <button className="quiz-btn btn-outline mock-toolbar-btn mock-btn-check" onClick={handleCheckAnswer}>Kiểm tra đáp án</button>
+            <button className="quiz-btn btn-outline mock-toolbar-btn" onClick={handleClear}>Xóa lựa chọn</button>
+            <label className="toggle-switch zen-auto-next">
+              <input type="checkbox" checked={autoNext} onChange={() => setAutoNext(!autoNext)} />
               <span className="toggle-slider"></span>
-              <span className="toggle-label">Highlight</span>
+              <span className="toggle-label">Tự động chuyển câu</span>
             </label>
-            <button className="quiz-btn btn-outline mock-toolbar-btn mock-btn-active">
-              Lưu/khôi phục highlight ▾
-            </button>
-            <button className="quiz-btn btn-outline mock-toolbar-btn mock-btn-check" onClick={handleCheckAnswer}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-              Kiểm tra đáp án
-            </button>
-            <button className="quiz-btn btn-outline mock-toolbar-btn" onClick={handleClear}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="15" y1="9" x2="9" y2="15"></line>
-                <line x1="9" y1="9" x2="15" y2="15"></line>
-              </svg>
-              Xoá hết
-            </button>
             {(exerciseType === 'LISTENING_PART1' || exerciseType === 'LISTENING_PART2' || exerciseType === 'LISTENING_PART3' || exerciseType === 'LISTENING_PART4') && (
-              <button
-                className="quiz-btn btn-outline mock-toolbar-btn"
-                onClick={() => navigate(`/exercises/${slug}/dictation`)}
-                style={{ marginLeft: 'auto' }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 20h9"></path>
-                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                </svg>
+              <button className="quiz-btn btn-outline mock-toolbar-btn zen-dictation-btn" onClick={() => navigate('/exercises/' + slug + '/dictation')}>
                 Luyện nghe chép chính tả
               </button>
             )}
           </div>
 
-          {/* Exercise Content — render theo exerciseType */}
-          {renderExerciseContent()}
+          <section className="zen-question-stage">{renderExerciseContent()}</section>
 
-          {/* Navigation & Question grid */}
-          <div className="quiz-nav-grid-container" style={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '24px' }}>
-            <div className="quiz-nav-top" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button className="quiz-nav-btn" onClick={handlePrev} disabled={currentIndex === 0} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#e8f0fe', color: '#35509a', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: currentIndex === 0 ? 'not-allowed' : 'pointer', opacity: currentIndex === 0 ? 0.5 : 1 }}>
-                ‹ Câu trước
-              </button>
-
-              <label className="toggle-switch" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={autoNext}
-                    onChange={() => setAutoNext(!autoNext)}
-                    style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer', zIndex: 2 }}
-                  />
-                  <div style={{ width: '40px', height: '22px', background: autoNext ? '#35509a' : '#ccc', borderRadius: '20px', position: 'relative', transition: 'background-color 0.2s' }}>
-                    <div style={{ position: 'absolute', top: '2px', left: autoNext ? '20px' : '2px', width: '18px', height: '18px', background: 'white', borderRadius: '50%', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }}></div>
-                  </div>
-                </div>
-                <span className="toggle-label" style={{ fontSize: '14px', color: '#333' }}>Tự động chuyển câu</span>
-              </label>
-
-              <button className="quiz-nav-btn" onClick={handleNext} disabled={currentIndex === totalItems - 1} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#e8f0fe', color: '#35509a', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: currentIndex === totalItems - 1 ? 'not-allowed' : 'pointer', opacity: currentIndex === totalItems - 1 ? 0.5 : 1 }}>
-                Câu sau ›
-              </button>
+          <div className="quiz-nav-grid-container zen-bottom-nav">
+            <button className="quiz-nav-btn" onClick={handlePrev} disabled={currentIndex === 0}>← Câu trước</button>
+            <div className="zen-bottom-count">
+              <span>{currentQuestionLabel}</span>
+              <strong>{progressPercent}% hoàn thành</strong>
             </div>
-
-            <div className="question-grid-inner">
-              <div className="question-grid-title" style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px', color: '#333' }}>Danh sách bài tập:</div>
-              <div className="question-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {allQuestions.map((q, idx) => {
-                  const isCurrent = getQuestionGridStatus(q) === 'current';
-                  const isAnswered = getQuestionGridStatus(q) === 'answered';
-                  
-                  let bgColor = 'white';
-                  let textColor = '#333';
-                  let borderColor = '#ccc';
-                  
-                  if (isCurrent) {
-                    bgColor = '#35509a';
-                    textColor = 'white';
-                    borderColor = '#35509a';
-                  } else if (isAnswered) {
-                    bgColor = '#f0f4ff';
-                    textColor = '#35509a';
-                    borderColor = '#35509a';
-                  }
-
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => handleGridClick(q)}
-                      style={{ 
-                        width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        borderRadius: '4px', border: `1px solid ${borderColor}`, background: bgColor,
-                        color: textColor, cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s'
-                      }}
-                    >
-                      {idx + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <button className="quiz-nav-btn" onClick={handleNext} disabled={currentIndex === totalItems - 1}>Câu tiếp →</button>
           </div>
-          
-          {/* Footer Next Lesson Button */}
+
           {exercise.nextTopicName && (
-            <button 
-              className="quiz-finish-next-btn"
-              onClick={() => navigate(`/topics/${exercise.nextTopicSlug}`)}
-              style={{
-                width: '100%',
-                padding: '24px',
-                marginTop: '32px',
-                backgroundColor: 'transparent',
-                color: '#1a1a1a',
-                border: 'none',
-                borderTop: '1px solid #e0e0e0',
-                fontSize: '14px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '8px',
-                textTransform: 'uppercase',
-                transition: 'color 0.2s',
-              }}
-              onMouseOver={(e) => e.currentTarget.style.color = '#35509a'}
-              onMouseOut={(e) => e.currentTarget.style.color = '#1a1a1a'}
-            >
-              HOÀN THÀNH & HỌC BÀI TIẾP THEO <span style={{ fontSize: '18px' }}>→</span>
+            <button className="quiz-finish-next-btn" onClick={() => navigate('/topics/' + exercise.nextTopicSlug)}>
+              Hoàn thành và học bài tiếp theo →
             </button>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

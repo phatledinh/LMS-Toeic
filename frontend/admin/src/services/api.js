@@ -75,92 +75,122 @@ let MOCK_DECKS = [
 ];
 
 // ========== Sections ==========
-export const getSections = () => mockResponse(MOCK_SECTIONS);
-export const getSectionBySlug = (slug) => mockResponse(MOCK_SECTIONS.find(s => s.slug === slug));
+export const getSections = () =>
+  fetch(`${BASE_URL}/admin/courses/sections`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const getSectionBySlug = (slug) =>
+  fetch(`${BASE_URL}/courses/sections/${slug}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // ========== Topics ==========
-export const getTopicsBySection = (sectionId) => mockResponse(MOCK_TOPICS.filter(t => t.sectionId == sectionId));
-export const getTopicById = (id) => mockResponse(MOCK_TOPICS.find(t => t.id == id));
+export const getTopicsBySection = async (sectionId) => {
+  const res = await getSections();
+  const section = (res.data || []).find((item) => String(item.id) === String(sectionId));
+  return { data: section?.topics || [] };
+};
+
+export const getTopicById = async (id) => {
+  const res = await getSections();
+  const topic = (res.data || [])
+    .flatMap((section) => section.topics || [])
+    .find((item) => String(item.id) === String(id));
+  return { data: topic };
+};
 
 // ========== Lessons ==========
 export const getLessonsByTopic = (topicId) => mockResponse(MOCK_LESSONS.filter(l => l.topicId == topicId));
 export const getLessonById = (id) => mockResponse(MOCK_LESSONS.find(l => l.id == id));
 
 // ========== Exercises ==========
-export const getExercisesByTopic = (topicId) => mockResponse(MOCK_EXERCISES.filter(e => e.topicId == topicId));
-export const getExerciseDetailById = (id) => {
-    const exercise = MOCK_EXERCISES.find(e => e.id == id) || MOCK_EXERCISES[0];
-    const questions = MOCK_QUESTIONS.filter(q => q.exerciseId == id);
-    const groups = MOCK_GROUPS.filter(g => g.exerciseId == id);
-    return mockResponse({ ...exercise, questions, groups });
+export const getExercisesByTopic = async (topicId) => {
+  const topicRes = await getTopicById(topicId);
+  return { data: topicRes.data?.exercises || [] };
 };
+
+export const getExerciseDetailById = (id) =>
+  fetch(`${BASE_URL}/exercises/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // ========== Admin: Sections ==========
-export const adminCreateSection = async (data) => {
-  const newSec = { id: Date.now(), ...data };
-  MOCK_SECTIONS.push(newSec);
-  return mockSuccess();
-};
-export const adminUpdateSection = async (id, data) => {
-  MOCK_SECTIONS = MOCK_SECTIONS.map(s => s.id == id ? { ...s, ...data } : s);
-  return mockSuccess();
-};
-export const adminDeleteSection = async (id) => {
-  MOCK_SECTIONS = MOCK_SECTIONS.filter(s => s.id != id);
-  return mockSuccess();
-};
+export const adminCreateSection = (data) =>
+  fetch(`${BASE_URL}/admin/courses/sections`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ isActive: true, ...data }),
+  }).then(handleResponse);
+
+export const adminUpdateSection = (id, data) =>
+  fetch(`${BASE_URL}/admin/courses/sections/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ isActive: true, ...data }),
+  }).then(handleResponse);
+
+export const adminDeleteSection = (id) =>
+  fetch(`${BASE_URL}/admin/courses/sections/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Topics ==========
-export const adminCreateTopic = async (sectionId, data) => {
-  const newTopic = { id: Date.now(), sectionId, ...data };
-  MOCK_TOPICS.push(newTopic);
-  return mockSuccess();
-};
-export const adminUpdateTopic = async (id, data) => {
-  MOCK_TOPICS = MOCK_TOPICS.map(t => t.id == id ? { ...t, ...data } : t);
-  return mockSuccess();
-};
-export const adminDeleteTopic = async (id) => {
-  MOCK_TOPICS = MOCK_TOPICS.filter(t => t.id != id);
-  return mockSuccess();
-};
+export const adminCreateTopic = (sectionId, data) =>
+  fetch(`${BASE_URL}/admin/courses/topics`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ isActive: true, sectionId: Number(sectionId), ...data }),
+  }).then(handleResponse);
+
+export const adminUpdateTopic = (id, data) =>
+  fetch(`${BASE_URL}/admin/courses/topics/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ isActive: true, ...data }),
+  }).then(handleResponse);
+
+export const adminDeleteTopic = (id) =>
+  fetch(`${BASE_URL}/admin/courses/topics/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Exercises ==========
-export const adminCreateExercise = async (topicId, data) => {
-  MOCK_EXERCISES.push({ id: Date.now(), topicId, ...data });
-  return mockSuccess();
-};
-export const adminUpdateExercise = async (id, data) => {
-  MOCK_EXERCISES = MOCK_EXERCISES.map(e => e.id == id ? { ...e, ...data } : e);
-  return mockSuccess();
-};
-export const adminDeleteExercise = async (id) => {
-  MOCK_EXERCISES = MOCK_EXERCISES.filter(e => e.id != id);
-  return mockSuccess();
-};
+export const adminCreateExercise = (topicId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({
+      isActive: true,
+      totalQuestions: 0,
+      orderIndex: 1,
+      topicId: Number(topicId),
+      ...data,
+    }),
+  }).then(handleResponse);
 
-export const adminAddQuestion = async (exerciseId, data) => {
-  MOCK_QUESTIONS.push({ id: Date.now(), exerciseId, ...data });
-  return mockSuccess();
-};
-export const adminDeleteQuestion = async (questionId) => {
-  MOCK_QUESTIONS = MOCK_QUESTIONS.filter(q => q.id != questionId);
-  return mockSuccess();
-};
+export const adminUpdateExercise = (id, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({
+      isActive: true,
+      ...data,
+    }),
+  }).then(handleResponse);
+
+export const adminDeleteExercise = (id) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+export const adminAddQuestion = (exerciseId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${exerciseId}/questions`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteQuestion = (questionId) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/questions/${questionId}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Exercise Question Groups ==========
-export const adminAddQuestionGroup = async (exerciseId, data) => {
-  MOCK_GROUPS.push({ id: Date.now(), exerciseId, ...data });
-  return mockSuccess();
-}
-export const adminUpdateQuestionGroup = async (groupId, data) => {
-  MOCK_GROUPS = MOCK_GROUPS.map(g => g.id == groupId ? { ...g, ...data } : g);
-  return mockSuccess();
-}
-export const adminDeleteQuestionGroup = async (groupId) => {
-  MOCK_GROUPS = MOCK_GROUPS.filter(g => g.id != groupId);
-  return mockSuccess();
-}
+export const adminAddQuestionGroup = (exerciseId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${exerciseId}/question-groups`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminUpdateQuestionGroup = (groupId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/question-groups/${groupId}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteQuestionGroup = (groupId) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/question-groups/${groupId}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Lessons ==========
 export const adminCreateLesson = async (topicId, data) => {

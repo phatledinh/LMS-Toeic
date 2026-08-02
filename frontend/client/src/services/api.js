@@ -2352,18 +2352,11 @@ export const login = async (data) => { await delay(); return { data: { token: 'm
 export const register = async (data) => { await delay(); return { data: { message: 'Đăng ký thành công' } }; };
 
 // Sections
-export const getSections = async () => { await delay(); return { data: mockSections }; };
-export const getSectionBySlug = async (slug) => { 
-  await delay(); 
-  const section = mockSections.find(s => s.slug === slug);
-  if (!section) throw new Error('Not found');
-  const sectionTopics = mockTopics.filter(t => t.sectionId === section.id).map(t => ({
-    ...t,
-    lessons: mockLessons.filter(l => l.topicId === t.id),
-    exercises: mockExercises.filter(e => e.topicId === t.id)
-  }));
-  return { data: { ...section, topics: sectionTopics } };
-};
+export const getSections = () =>
+  fetch(`${BASE_URL}/courses/sections`, { headers: getAuthHeaders() }).then(handleResponse);
+
+export const getSectionBySlug = (slug) =>
+  fetch(`${BASE_URL}/courses/sections/${slug}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // Topics
 export const getTopicsBySection = async (sectionId) => { await delay(); return { data: mockTopics.filter(t => t.sectionId === Number(sectionId)) }; };
@@ -2374,13 +2367,13 @@ export const getLessonsByTopic = async (topicId) => { await delay(); return { da
 export const getLessonById = async (id) => { await delay(); return { data: mockLessons.find(l => l.id === Number(id)) }; };
 
 // Exercises
-export const getExercisesByTopic = async (topicId) => { await delay(); return { data: mockExercises.filter(e => e.topicId === Number(topicId)) }; };
-export const getExerciseDetailById = async (id) => { 
-  await delay(); 
-  const exercise = mockExercises.find(e => e.id === Number(id));
-  if (!exercise) throw new Error('Not found');
-  return { data: { ...exercise, questions: mockQuestions } };
+export const getExercisesByTopic = async (topicId) => {
+  await delay();
+  return { data: mockExercises.filter(e => e.topicId === Number(topicId)) };
 };
+
+export const getExerciseDetailById = (id) =>
+  fetch(`${BASE_URL}/exercises/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // Flashcards (Decks)
 export const getSystemDecks = () =>

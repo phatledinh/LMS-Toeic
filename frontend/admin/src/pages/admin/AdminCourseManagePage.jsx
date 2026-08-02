@@ -60,9 +60,9 @@ const AdminCourseManagePage = () => {
   const openSectionModal = (section = null) => {
     setEditingItem(section);
     if (section) {
-      setFormData({ title: section.title, description: section.description || '', slug: section.slug || '', orderIndex: section.orderIndex || 0 });
+      setFormData({ title: section.title, description: section.description || '', slug: section.slug || '', orderIndex: section.orderIndex || 0, isActive: true });
     } else {
-      setFormData({ title: '', description: '', slug: '', orderIndex: 0 });
+      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true });
     }
     setIsSectionModalOpen(true);
   };
@@ -100,9 +100,9 @@ const AdminCourseManagePage = () => {
   const openTopicModal = (topic = null) => {
     setEditingItem(topic);
     if (topic) {
-      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0 });
+      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0, isActive: true, sectionId: selectedSection.id });
     } else {
-      setFormData({ title: '', description: '', slug: '', orderIndex: 0 });
+      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true, sectionId: selectedSection.id });
     }
     setIsTopicModalOpen(true);
   };

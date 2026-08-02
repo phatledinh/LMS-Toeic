@@ -18,6 +18,7 @@ import FlashcardDictationPage from './pages/FlashcardDictationPage';
 import FlashcardListenPage from './pages/FlashcardListenPage';
 import PracticePage from './pages/PracticePage';
 import DictationPage from './pages/DictationPage';
+import OnlineTestsPage from './pages/OnlineTestsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './index.css';
 import './flashcard.css';
@@ -34,6 +35,11 @@ function AppContent() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/online-tests" element={
+          <PrivateRoute>
+            <OnlineTestsPage />
+          </PrivateRoute>
+        } />
 
         {/* Trang chủ */}
         <Route path="/" element={
