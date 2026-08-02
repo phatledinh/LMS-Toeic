@@ -19,6 +19,7 @@ import FlashcardListenPage from './pages/FlashcardListenPage';
 import PracticePage from './pages/PracticePage';
 import DictationPage from './pages/DictationPage';
 import OnlineTestsPage from './pages/OnlineTestsPage';
+import OnlineTestPartsPage from './pages/OnlineTestPartsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './index.css';
 import './flashcard.css';
@@ -38,6 +39,11 @@ function AppContent() {
         <Route path="/online-tests" element={
           <PrivateRoute>
             <OnlineTestsPage />
+          </PrivateRoute>
+        } />
+        <Route path="/online-tests/:testSlug/parts" element={
+          <PrivateRoute>
+            <OnlineTestPartsPage />
           </PrivateRoute>
         } />
 
