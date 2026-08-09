@@ -30,9 +30,12 @@ const PrivateRoute = ({ children }) => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  const hideGlobalHeader = location.pathname.startsWith('/exercises/') && !location.pathname.endsWith('/dictation');
+
   return (
     <div className="app-container">
-      <Header />
+      {!hideGlobalHeader && <Header />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

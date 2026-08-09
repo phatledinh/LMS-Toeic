@@ -12,7 +12,10 @@ const PART_CONFIG = [
   { part: 7, type: 'READING_PART7' },
 ];
 
+const ENABLED_ONLINE_TEST_SLUGS = ['test-2-2026'];
+
 const getTestTitle = (section) => {
+  if (section.slug === 'test-2-2026') return 'TEST 2 - 2026';
   if (section.slug === 'de-thi-online-toeic-demo') return 'Bài test giữa kì';
   return section.title || 'Bài test TOEIC';
 };
@@ -43,6 +46,7 @@ const OnlineTestsPage = () => {
   const testGroups = useMemo(() => {
     return sections
       .filter((section) => !section.slug?.includes('tu-vung') && !section.slug?.includes('ngu-phap'))
+      .filter((section) => ENABLED_ONLINE_TEST_SLUGS.includes(section.slug))
       .map((section) => {
         const exercises = (section.topics || []).flatMap((topic) =>
           (topic.exercises || []).map((exercise) => ({
@@ -72,6 +76,8 @@ const OnlineTestsPage = () => {
       })
       .filter((group) => group.exercises.length > 0)
       .sort((a, b) => {
+        if (a.slug === 'test-2-2026') return -1;
+        if (b.slug === 'test-2-2026') return 1;
         if (a.slug === 'de-thi-online-toeic-demo') return -1;
         if (b.slug === 'de-thi-online-toeic-demo') return 1;
         return String(a.title).localeCompare(String(b.title));

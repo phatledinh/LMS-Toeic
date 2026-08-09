@@ -20,6 +20,7 @@ const TIME_OPTIONS = [
 ];
 
 const getTestTitle = (section) => {
+  if (section.slug === 'test-2-2026') return 'TEST 2 - 2026';
   if (section.slug === 'de-thi-online-toeic-demo') return 'Bài test giữa kì';
   return section.title || 'Bài test TOEIC';
 };
@@ -70,7 +71,10 @@ const OnlineTestPartsPage = () => {
     choosePartsEnabled ? selectedParts.includes(row.part) && row.test : row.test
   );
 
-  const selectedQuestionCount = selectedAvailableRows.reduce((sum, row) => sum + (Number(row.totalQuestions) || 0), 0);
+  const selectedQuestionCount = selectedAvailableRows.reduce(
+    (sum, row) => sum + (Number(row.totalQuestions) || 0),
+    0
+  );
   const testTitle = section ? getTestTitle(section) : 'Bài test TOEIC';
 
   const togglePart = (partNumber) => {
@@ -127,7 +131,7 @@ const OnlineTestPartsPage = () => {
           </label>
           <div className="part-picker-summary">
             <strong>{selectedQuestionCount}</strong>
-            <span>câu trong bài demo</span>
+            <span>câu trong bài test</span>
           </div>
         </div>
 
@@ -161,9 +165,6 @@ const OnlineTestPartsPage = () => {
                       <span className="part-picker-name">PART {row.part}</span>
                       <span className="part-picker-count">
                         {row.totalQuestions || row.standardQuestions} CÂU
-                        {row.totalQuestions > 0 && row.totalQuestions !== row.standardQuestions && (
-                          <small>demo</small>
-                        )}
                       </span>
                     </label>
                   );

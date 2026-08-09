@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getExerciseDetailById } from '../services/api';
 import { getFullUrl } from '../utils/urlUtils';
 import { useAuth } from '../context/AuthContext';
+import { ZENLISH_TEST_2_INTROS } from '../data/zenlishTestIntros';
 
 // ==================== Sub-components ====================
 
@@ -18,9 +20,98 @@ const EXERCISE_PART_LABELS = {
 };
 
 const isGroupedExerciseType = (exerciseType) => exerciseType !== 'GRAMMAR' && exerciseType !== 'READING_PART5';
+const isListeningExerciseType = (exerciseType) => exerciseType?.startsWith('LISTENING_PART');
+const isReadingExerciseType = (exerciseType) => exerciseType?.startsWith('READING_PART');
 
-/** Audio Player dùng chung cho Listening */
-export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
+const SECTION_INTROS = {
+  LISTENING: {
+    title: 'LISTENING',
+    text: 'Directions: This is the Listening section of the test. You will hear several questions and conversations. Each recording will be played only one time. Mark the best answer for each question.',
+  },
+  READING: {
+    title: 'READING',
+    text: 'Directions: This is the Reading section of the test. Read each question carefully and choose the best answer. You may move between Reading questions before submitting your test.',
+  },
+};
+
+const getExerciseIntro = (exercise) => {
+  if (exercise?.sectionSlug === 'test-2-2026') {
+    return ZENLISH_TEST_2_INTROS[exercise.exerciseType] || null;
+  }
+  return null;
+};
+
+/** Audio Player dÃ¹ng chung cho Listening */
+const parseListeningPassage = (passage) => {
+  if (!passage) return { transcript: '', translation: '' };
+  const parts = passage.split('---');
+  let transcript = parts[0] ? parts[0].trim() : '';
+  let translation = parts[1] ? parts[1].trim() : '';
+
+  if (transcript.startsWith('Transcript')) {
+    transcript = transcript.substring('Transcript'.length).trim();
+  }
+  if (translation.startsWith('Dịch nghĩa')) {
+    translation = translation.substring('Dịch nghĩa'.length).trim();
+  }
+  return { transcript, translation };
+};
+
+const buildQuestionAudioText = (question, availableOptions = ['A', 'B', 'C', 'D']) => {
+  if (!question) return '';
+  const parts = [`Question ${question.questionNumber || ''}.`];
+  if (question.content) parts.push(question.content);
+  availableOptions.forEach((option) => {
+    const text = question[`option${option}`];
+    if (text) parts.push(`${option}. ${text}`);
+  });
+  return parts.join(' ');
+};
+
+const buildListeningFallbackText = (group, availableOptions = ['A', 'B', 'C', 'D']) => {
+  const { transcript } = parseListeningPassage(group?.passage);
+  const questionText = (group?.questions || [])
+    .map((question) => buildQuestionAudioText(question, availableOptions))
+    .filter(Boolean)
+    .join(' ');
+  return [transcript, questionText].filter(Boolean).join(' ');
+};
+
+const containsHtml = (value = '') => /<\/?[a-z][\s\S]*>/i.test(value);
+
+const RichText = ({ html, className, style }) => {
+  if (!html) return null;
+
+  if (!containsHtml(html)) {
+    return (
+      <div className={className} style={style}>
+        {html}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      style={style}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+    />
+  );
+};
+
+const htmlToPlainText = (value = '') => String(value)
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/p>/gi, '\n')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+export const AudioPlayer = ({ audioUrl, label, fallbackText, autoPlay = false, locked = false, onEnded }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -30,6 +121,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(1);
   const audioRef = useRef(null);
+  const speechShouldCompleteRef = useRef(false);
 
   const cleanFallbackText = (fallbackText || '')
     .replace(/^Transcript/i, '')
@@ -38,16 +130,6 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
   const hasAudioUrl = Boolean(audioUrl);
   const fullUrl = hasAudioUrl ? getFullUrl(audioUrl) : null;
 
-  useEffect(() => {
-    return () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  if (!hasAudioUrl && !cleanFallbackText) return null;
-
   const formatTime = (time) => {
     if (isNaN(time)) return "00:00";
     const minutes = Math.floor(time / 60);
@@ -55,21 +137,86 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  const finishPlayback = useCallback(() => {
+    speechShouldCompleteRef.current = false;
+    setIsPlaying(false);
+    if (onEnded) onEnded();
+  }, [onEnded]);
+
+  const playFallbackSpeech = useCallback(() => {
+    if (!cleanFallbackText || !window.speechSynthesis) return;
+    speechShouldCompleteRef.current = false;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanFallbackText);
+    utterance.lang = 'en-US';
+    utterance.rate = playbackRate;
+    utterance.volume = isMuted ? 0 : volume;
+    utterance.onend = () => {
+      if (speechShouldCompleteRef.current) {
+        finishPlayback();
+      } else {
+        setIsPlaying(false);
+      }
+    };
+    utterance.onerror = () => setIsPlaying(false);
+    speechShouldCompleteRef.current = true;
+    window.speechSynthesis.speak(utterance);
+    setIsPlaying(true);
+  }, [cleanFallbackText, finishPlayback, isMuted, playbackRate, volume]);
+
+  const playAudio = useCallback(() => {
+    if (!audioRef.current) return;
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        setIsPlaying(true);
+      }).catch(error => {
+        console.error("Error playing audio:", error);
+        setIsPlaying(false);
+      });
+    } else {
+      setIsPlaying(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    if (window.speechSynthesis) {
+      speechShouldCompleteRef.current = false;
+      window.speechSynthesis.cancel();
+    }
+  }, [fullUrl, cleanFallbackText]);
+
+  useEffect(() => {
+    if (!autoPlay) return;
+    if (hasAudioUrl) {
+      playAudio();
+      return;
+    }
+    playFallbackSpeech();
+  }, [autoPlay, hasAudioUrl, playAudio, playFallbackSpeech]);
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        speechShouldCompleteRef.current = false;
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  if (!hasAudioUrl && !cleanFallbackText) return null;
+
   const togglePlay = () => {
     if (!hasAudioUrl && cleanFallbackText && window.speechSynthesis) {
       if (isPlaying) {
+        speechShouldCompleteRef.current = false;
         window.speechSynthesis.cancel();
         setIsPlaying(false);
       } else {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(cleanFallbackText);
-        utterance.lang = 'en-US';
-        utterance.rate = playbackRate;
-        utterance.volume = isMuted ? 0 : volume;
-        utterance.onend = () => setIsPlaying(false);
-        utterance.onerror = () => setIsPlaying(false);
-        window.speechSynthesis.speak(utterance);
-        setIsPlaying(true);
+        playFallbackSpeech();
       }
       return;
     }
@@ -79,17 +226,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-          }).catch(error => {
-            console.error("Error playing audio:", error);
-            setIsPlaying(false);
-          });
-        } else {
-          setIsPlaying(true);
-        }
+        playAudio();
       }
     }
   };
@@ -120,6 +257,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
       setIsMuted(true);
     }
     if (!hasAudioUrl && isPlaying && window.speechSynthesis) {
+      speechShouldCompleteRef.current = false;
       window.speechSynthesis.cancel();
       setIsPlaying(false);
     }
@@ -160,6 +298,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
       setShowSpeedMenu(false);
     }
     if (!hasAudioUrl && isPlaying && window.speechSynthesis) {
+      speechShouldCompleteRef.current = false;
       window.speechSynthesis.cancel();
       setIsPlaying(false);
     }
@@ -167,6 +306,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
 
   const handleReload = () => {
     if (!hasAudioUrl && cleanFallbackText && window.speechSynthesis) {
+      speechShouldCompleteRef.current = false;
       window.speechSynthesis.cancel();
       setIsPlaying(false);
       setShowSpeedMenu(false);
@@ -194,15 +334,15 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
   const speedOptions = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
 
   return (
-    <div className="custom-audio-player">
+    <div className={`custom-audio-player ${locked ? 'audio-player-locked' : ''}`}>
       <audio
         ref={audioRef}
         src={fullUrl}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onEnded={() => setIsPlaying(false)}
+        onEnded={finishPlayback}
       />
-      <button className="audio-play-btn" onClick={togglePlay} title={hasAudioUrl ? label : 'Play transcript with browser TTS'}>
+      <button className="audio-play-btn" onClick={togglePlay} disabled={locked} title={locked ? 'Audio tự phát trong phần Listening' : (hasAudioUrl ? label : 'Play transcript with browser TTS')}>
         {isPlaying ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <rect x="6" y="4" width="4" height="16" />
@@ -222,6 +362,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
           max={duration || 0}
           value={currentTime}
           onChange={handleSeek}
+          disabled={locked}
           style={{ '--progress': `${(currentTime / (duration || 1)) * 100}%` }}
         />
       ) : (
@@ -231,7 +372,7 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
         {hasAudioUrl ? formatTime(currentTime) : 'TTS'}
       </span>
       <div className="audio-volume-control">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368" onClick={toggleMute} style={{cursor: 'pointer'}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368" onClick={locked ? undefined : toggleMute} style={{cursor: locked ? 'default' : 'pointer'}}>
           {isMuted || volume === 0 ? (
              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
           ) : (
@@ -246,10 +387,11 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
           step="0.01"
           value={volume}
           onChange={handleVolumeChange}
+          disabled={locked}
           style={{ '--progress': `${volume * 100}%` }}
         />
       </div>
-      <div style={{ position: 'relative' }}>
+      {!locked && <div style={{ position: 'relative' }}>
         <div className="audio-gear-btn" onClick={() => setShowSpeedMenu(!showSpeedMenu)}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
@@ -273,17 +415,82 @@ export const AudioPlayer = ({ audioUrl, label, fallbackText }) => {
               </div>
             </div>
           )}
-        </div>
+        </div>}
     </div>
   );
 };
 
 /** Một câu hỏi MCQ (dùng lại cho mọi layout) */
-export const QuestionMCQ = ({ question, answer, showAnswer, onAnswer, hideOptionsText = false, hideQuestionNumber = false, availableOptions }) => {
+const ListeningPartIntroLayout = ({ intro, firstGroup, onComplete, enableAudio = true }) => {
+  const completedRef = useRef(false);
+  const fallbackText = htmlToPlainText(intro?.html || intro?.text || '');
+
+  const completeIntro = useCallback(() => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    onComplete();
+  }, [onComplete]);
+
+  useEffect(() => {
+    completedRef.current = false;
+  }, [intro]);
+
+  return (
+    <div className="listening-part-intro">
+      <div className="listening-intro-paper">
+        {!intro?.html && <h2>{intro?.title || 'LISTENING'}</h2>}
+        {intro?.html ? (
+          <RichText html={intro.html} className="part-intro-html" />
+        ) : (
+          <p>{intro?.text}</p>
+        )}
+        {!intro?.html && firstGroup?.imageUrl && (
+          <div className="listening-intro-image">
+            <img src={getFullUrl(firstGroup.imageUrl)} alt={intro?.title || 'Listening part'} />
+          </div>
+        )}
+      </div>
+      {enableAudio && (
+        <div className="listening-intro-audio">
+          <AudioPlayer
+            audioUrl={intro?.audioUrl}
+            label={intro?.title || 'Intro'}
+            fallbackText={fallbackText}
+            autoPlay={true}
+            locked={true}
+            onEnded={completeIntro}
+          />
+        </div>
+      )}
+      <div className="listening-intro-actions">
+        <button className="listening-intro-start" onClick={completeIntro}>
+          BẮT ĐẦU
+        </button>
+      </div>
+    </div>
+  );
+};
+export const QuestionMCQ = ({
+  question,
+  answer,
+  showAnswer,
+  onAnswer,
+  hideOptionsText = false,
+  hideQuestionNumber = false,
+  availableOptions,
+  questionNumberFormat = 'q',
+  inlineQuestionContent = false,
+}) => {
   if (!question) return null;
 
   const options = availableOptions || ['A', 'B', 'C', 'D'];
   const isCorrect = showAnswer && answer && answer === question.correctAnswer;
+  const questionNumberText = questionNumberFormat === 'dot'
+    ? `${question.questionNumber}.`
+    : `Q${question.questionNumber}:`;
 
   const getOptionClass = (opt) => {
     if (!showAnswer) {
@@ -298,12 +505,23 @@ export const QuestionMCQ = ({ question, answer, showAnswer, onAnswer, hideOption
     <div className="group-question-item">
       {!hideQuestionNumber && question.content && (
         <>
-          <div className="question-number">Q{question.questionNumber}:</div>
-          <p className="question-content">{question.content}</p>
+          {inlineQuestionContent ? (
+            <div className="question-number reading-inline-question">
+              <span>{questionNumberText}</span>
+              <RichText html={question.content} className="question-content" />
+            </div>
+          ) : (
+            <>
+              <div className="question-number">{questionNumberText}</div>
+              <RichText html={question.content} className="question-content" />
+            </>
+          )}
         </>
       )}
       {!hideQuestionNumber && !question.content && (
-        <div className="question-number">Câu {question.questionNumber}</div>
+        <div className="question-number">
+          {questionNumberFormat === 'dot' ? `${question.questionNumber}.` : `Câu ${question.questionNumber}`}
+        </div>
       )}
 
       <div className="options-list">
@@ -332,15 +550,17 @@ export const QuestionMCQ = ({ question, answer, showAnswer, onAnswer, hideOption
       </div>
 
       {/* Giải thích */}
-      {showAnswer && answer && question.explanation && (
+      {showAnswer && question.explanation && (
         <div className={`explanation-box ${isCorrect ? 'correct' : 'wrong'}`}>
           <div style={{ marginBottom: '8px' }}>
             <strong>{isCorrect ? '✓ Đúng!' : '✗ Sai!'}</strong>
             <span> Đáp án: {question.correctAnswer}</span>
           </div>
-          <div className="explanation-text" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
-            {question.explanation}
-          </div>
+          <RichText
+            html={question.explanation}
+            className="explanation-text"
+            style={{ whiteSpace: containsHtml(question.explanation) ? 'normal' : 'pre-line', lineHeight: '1.6' }}
+          />
         </div>
       )}
     </div>
@@ -349,7 +569,9 @@ export const QuestionMCQ = ({ question, answer, showAnswer, onAnswer, hideOption
 
 // ==================== Layout Components ====================
 
-/** Layout cho GRAMMAR & READING_PART5 — MCQ thuần, navigate từng câu */
+/** Layout cho GRAMMAR & READING_PART5 - MCQ thuần, navigate từng câu */
+const SHOW_LISTENING_TRANSCRIPT_HELP = false;
+
 export const GrammarLayout = ({ questions, currentIndex, setCurrentIndex, answers, showAnswer, handleAnswer }) => {
   const currentQ = questions[currentIndex];
   if (!currentQ) return null;
@@ -368,8 +590,38 @@ export const GrammarLayout = ({ questions, currentIndex, setCurrentIndex, answer
   );
 };
 
-/** Layout cho LISTENING_PART1 — Audio + Image + 1 câu MCQ, navigate từng group */
-export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer }) => {
+export const ReadingPart5Layout = ({ questions, currentIndex, answers, showAnswer, handleAnswer }) => {
+  const currentQ = questions[currentIndex];
+  if (!currentQ) return null;
+
+  return (
+    <div className="part1-mock-layout reading-part5-layout">
+      <div className="mock-split-row reading-split-row">
+        <div className="mock-left-col reading-prompt-col">
+          <h2 className="toeic-question-label">Câu hỏi</h2>
+        </div>
+        <div className="mock-right-col reading-answer-col">
+          <div className="mock-question-container">
+            <QuestionMCQ
+              question={currentQ}
+              answer={answers[currentQ.id]}
+              showAnswer={showAnswer}
+              onAnswer={handleAnswer}
+              hideOptionsText={false}
+              hideQuestionNumber={false}
+              availableOptions={['A', 'B', 'C', 'D']}
+              questionNumberFormat="dot"
+              inlineQuestionContent={true}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Layout cho LISTENING_PART1 - Audio + Image + 1 câu MCQ, navigate từng group */
+export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer, autoPlay = false, lockedAudio = false, onAudioEnded }) => {
   const group = groups[currentGroupIndex];
   const [showTranscript, setShowTranscript] = useState(false);
 
@@ -410,10 +662,11 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout">
       <div className="mock-audio-row">
-        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} fallbackText={transcript} />
+        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} fallbackText={buildListeningFallbackText(group, ['A', 'B', 'C', 'D']) || transcript} autoPlay={autoPlay} locked={lockedAudio} onEnded={onAudioEnded} />
       </div>
       <div className="mock-split-row">
         <div className="mock-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <h2 className="toeic-question-label">Câu hỏi</h2>
           {group.imageUrl && (
             <div className="mock-image-container">
               <img src={getFullUrl(group.imageUrl)} alt={`Hình câu ${question?.questionNumber}`} />
@@ -421,7 +674,7 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
           )}
           
           <div className="transcript-translation-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-            {transcript && (
+            {(SHOW_LISTENING_TRANSCRIPT_HELP || showAnswer) && transcript && (
               <div className="toggle-item">
                 <div 
                   className="toggle-header" 
@@ -440,7 +693,7 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
                   <span>Transcript</span>
                   <span style={{ fontSize: '10px' }}>{showTranscript ? '▼' : '▶'}</span>
                 </div>
-                {showTranscript && (
+                {(showTranscript || showAnswer) && (
                   <div 
                     className="toggle-content" 
                     style={{ 
@@ -468,7 +721,7 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
           {question && (
             <div className="mock-question-container">
               <div className="mock-qnum-title">
-                Q{question.questionNumber}:
+                {question.questionNumber}.
               </div>
               <QuestionMCQ
                 question={question}
@@ -487,8 +740,8 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
   );
 };
 
-/** Layout cho LISTENING_PART2 — Audio + 1 câu MCQ (3 đáp án A,B,C) */
-export const ListeningPart2Layout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer }) => {
+/** Layout cho LISTENING_PART2 - Audio + 1 câu MCQ (3 đáp án A,B,C) */
+export const ListeningPart2Layout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer, autoPlay = false, lockedAudio = false, onAudioEnded }) => {
   const group = groups[currentGroupIndex];
   if (!group) return null;
   const question = group.questions?.[0];
@@ -496,7 +749,7 @@ export const ListeningPart2Layout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout">
       <div className="mock-audio-row">
-        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} fallbackText={group.passage || question?.content} />
+        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} fallbackText={buildListeningFallbackText(group, ['A', 'B', 'C']) || group.passage || question?.content} autoPlay={autoPlay} locked={lockedAudio} onEnded={onAudioEnded} />
       </div>
       <div className="mock-split-row" style={{ display: 'block' }}>
         <div className="mock-question-container" style={{ width: '100%' }}>
@@ -517,8 +770,8 @@ export const ListeningPart2Layout = ({ groups, currentGroupIndex, answers, showA
   );
 };
 
-/** Layout cho LISTENING_PART3 & PART4 — Audio + N câu MCQ, navigate theo group */
-export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer }) => {
+/** Layout cho LISTENING_PART3 & PART4 - Audio + N câu MCQ, navigate theo group */
+export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer, autoPlay = false, lockedAudio = false, onAudioEnded }) => {
   const group = groups[currentGroupIndex];
   const [showTranscript, setShowTranscript] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
@@ -552,18 +805,21 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout" style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '0' }}>
       <div className="mock-audio-row" style={{ paddingBottom: '16px', marginBottom: '16px' }}>
-        <AudioPlayer audioUrl={group.audioUrl} label={`Nhóm ${currentGroupIndex + 1}`} fallbackText={transcript} />
+        <AudioPlayer audioUrl={group.audioUrl} label={`Nhóm ${currentGroupIndex + 1}`} fallbackText={buildListeningFallbackText(group, ['A', 'B', 'C', 'D']) || transcript} autoPlay={autoPlay} locked={lockedAudio} onEnded={onAudioEnded} />
       </div>
-      <div className="mock-split-row" style={{ alignItems: 'flex-start', gap: '24px' }}>
+      <div
+        className={`mock-split-row ${!group.imageUrl && !SHOW_LISTENING_TRANSCRIPT_HELP ? 'listening-no-left' : ''}`}
+        style={{ alignItems: 'flex-start', gap: '24px' }}
+      >
         <div className="mock-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {group.imageUrl && (
             <div className="mock-image-container" style={{ border: '1px solid #ccc', borderRadius: '4px', overflow: 'hidden', width: '100%' }}>
-              <img src={getFullUrl(group.imageUrl)} alt="Hình minh hoạ" style={{ width: '100%', display: 'block' }} />
+              <img src={getFullUrl(group.imageUrl)} alt="Hình minh họa" style={{ width: '100%', display: 'block' }} />
             </div>
           )}
           
           <div className="transcript-translation-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-            {transcript && (
+            {(SHOW_LISTENING_TRANSCRIPT_HELP || showAnswer) && transcript && (
               <div className="toggle-item">
                 <div 
                   className="toggle-header" 
@@ -582,7 +838,7 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
                   <span>Transcript</span>
                   <span style={{ fontSize: '10px' }}>{showTranscript ? '▼' : '▶'}</span>
                 </div>
-                {showTranscript && (
+                {(showTranscript || showAnswer) && (
                   <div 
                     className="toggle-content" 
                     style={{ 
@@ -603,7 +859,7 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
               </div>
             )}
             
-            {translation && (
+            {(SHOW_LISTENING_TRANSCRIPT_HELP || showAnswer) && translation && (
               <div className="toggle-item">
                 <div 
                   className="toggle-header" 
@@ -622,7 +878,7 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
                   <span>Dịch nghĩa</span>
                   <span style={{ fontSize: '10px' }}>{showTranslation ? '▼' : '▶'}</span>
                 </div>
-                {showTranslation && (
+                {(showTranslation || showAnswer) && (
                   <div 
                     className="toggle-content" 
                     style={{ 
@@ -656,6 +912,8 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
                 hideOptionsText={false}
                 hideQuestionNumber={false}
                 availableOptions={['A', 'B', 'C', 'D']}
+                questionNumberFormat="dot"
+                inlineQuestionContent={true}
               />
             </div>
           ))}
@@ -665,7 +923,7 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
   );
 };
 
-/** Layout cho READING_PART6 & PART7 — Split view: Passage (trái) + N câu MCQ (phải) */
+/** Layout cho READING_PART6 & PART7 - Split view: Passage (trái) + N câu MCQ (phải) */
 export const ReadingPassageLayout = ({ groups, currentGroupIndex, answers, showAnswer, handleAnswer }) => {
   const group = groups[currentGroupIndex];
   const [showTranslation, setShowTranslation] = useState(false);
@@ -698,7 +956,7 @@ export const ReadingPassageLayout = ({ groups, currentGroupIndex, answers, showA
         <div className="mock-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {group.imageUrl && (
             <div className="mock-image-container" style={{ border: '1px solid #ccc', borderRadius: '4px', overflow: 'hidden', width: '100%' }}>
-              <img src={getFullUrl(group.imageUrl)} alt="Hình minh hoạ" style={{ width: '100%', display: 'block' }} />
+              <img src={getFullUrl(group.imageUrl)} alt="Hình minh họa" style={{ width: '100%', display: 'block' }} />
             </div>
           )}
           
@@ -714,17 +972,16 @@ export const ReadingPassageLayout = ({ groups, currentGroupIndex, answers, showA
                 })}
               </div>
             ) : englishPassage && (
-              <div 
-                className="english-passage-content" 
-                style={{ 
-                  whiteSpace: 'pre-line', 
-                  fontSize: '14px', 
+              <RichText
+                html={englishPassage}
+                className="english-passage-content"
+                style={{
+                  whiteSpace: containsHtml(englishPassage) ? 'normal' : 'pre-line',
+                  fontSize: '14px',
                   color: '#333',
                   lineHeight: '1.6',
                 }}
-              >
-                {englishPassage}
-              </div>
+              />
             )}
             
             {translation && (
@@ -780,6 +1037,8 @@ export const ReadingPassageLayout = ({ groups, currentGroupIndex, answers, showA
                 hideOptionsText={false}
                 hideQuestionNumber={false}
                 availableOptions={['A', 'B', 'C', 'D']}
+                questionNumberFormat="dot"
+                inlineQuestionContent={true}
               />
             </div>
           ))}
@@ -803,10 +1062,14 @@ const QuizPage = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [showAnswer, setShowAnswer] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [answerReviewMode, setAnswerReviewMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(120 * 60);
   const [submitNotice, setSubmitNotice] = useState('');
   const [submitResult, setSubmitResult] = useState(null);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [incompleteModalOpen, setIncompleteModalOpen] = useState(false);
+  const [showPartBreakdown, setShowPartBreakdown] = useState(false);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
@@ -848,8 +1111,12 @@ const QuizPage = () => {
           setCurrentIndex(0);
           setAnswers({});
           setShowAnswer(false);
+          setAnswerReviewMode(false);
           setSubmitNotice('');
           setSubmitResult(null);
+          setResultModalOpen(false);
+          setIncompleteModalOpen(false);
+          setShowPartBreakdown(false);
           setRemainingSeconds(requestedMinutes * 60);
         })
         .catch(() => {
@@ -868,8 +1135,12 @@ const QuizPage = () => {
         setCurrentIndex(0);
         setAnswers({});
         setShowAnswer(false);
+        setAnswerReviewMode(false);
         setSubmitNotice('');
         setSubmitResult(null);
+        setResultModalOpen(false);
+        setIncompleteModalOpen(false);
+        setShowPartBreakdown(false);
         setRemainingSeconds(requestedMinutes * 60);
       })
       .catch(() => {
@@ -893,27 +1164,75 @@ const QuizPage = () => {
   const combinedItems = useMemo(() => {
     if (!isCombined) return [];
 
+    const hasSkillIntro = {
+      LISTENING: false,
+      READING: false,
+    };
+
     return combinedExercises.flatMap((item) => {
       const itemType = item.exerciseType || 'GRAMMAR';
       const partLabel = EXERCISE_PART_LABELS[itemType] || itemType.replaceAll('_', ' ');
+      const skill = isListeningExerciseType(itemType) ? 'LISTENING' : (itemType.startsWith('READING') ? 'READING' : null);
+      const itemsForExercise = [];
+      const intro = getExerciseIntro(item);
+
+      if (intro) {
+        itemsForExercise.push({
+          kind: 'intro',
+          exerciseType: itemType,
+          partLabel,
+          intro,
+          firstGroup: item.questionGroups?.[0],
+          questions: [],
+        });
+      } else if (skill && !hasSkillIntro[skill]) {
+        hasSkillIntro[skill] = true;
+        itemsForExercise.push({
+          kind: 'intro',
+          exerciseType: skill,
+          partLabel: skill,
+          intro: SECTION_INTROS[skill],
+          firstGroup: item.questionGroups?.[0],
+          questions: [],
+        });
+      }
 
       if (isGroupedExerciseType(itemType)) {
-        return (item.questionGroups || []).map((group) => ({
+        const groupItems = (item.questionGroups || []).flatMap((group) => {
+          if (itemType === 'LISTENING_PART1' || itemType === 'LISTENING_PART2') {
+            return (group.questions || []).map((question) => ({
+              kind: 'group',
+              exerciseType: itemType,
+              partLabel,
+              group: {
+                ...group,
+                questions: [question],
+              },
+              questions: [question],
+            }));
+          }
+
+          return [{
           kind: 'group',
           exerciseType: itemType,
           partLabel,
           group,
           questions: group.questions || [],
-        }));
+          }];
+        });
+
+        return [...itemsForExercise, ...groupItems];
       }
 
-      return (item.questions || []).map((question) => ({
+      const questionItems = (item.questions || []).map((question) => ({
         kind: 'question',
         exerciseType: itemType,
         partLabel,
         question,
         questions: [question],
       }));
+
+      return [...itemsForExercise, ...questionItems];
     });
   }, [isCombined, combinedExercises]);
 
@@ -926,6 +1245,35 @@ const QuizPage = () => {
     return groups.flatMap((group) => group.questions || []);
   }, [isCombined, combinedItems, isGrouped, questions, groups]);
 
+  const questionPartGroups = useMemo(() => {
+    const groupMap = new Map();
+
+    const addQuestion = (question, exerciseType, partLabel) => {
+      if (!question) return;
+      if (!groupMap.has(partLabel)) {
+        groupMap.set(partLabel, {
+          partLabel,
+          exerciseType,
+          questions: [],
+        });
+      }
+      groupMap.get(partLabel).questions.push(question);
+    };
+
+    if (isCombined) {
+      combinedItems.forEach((item) => {
+        if (!item?.questions?.length) return;
+        const partLabel = item.partLabel || EXERCISE_PART_LABELS[item.exerciseType] || item.exerciseType;
+        item.questions.forEach((question) => addQuestion(question, item.exerciseType, partLabel));
+      });
+      return Array.from(groupMap.values());
+    }
+
+    const partLabel = EXERCISE_PART_LABELS[exerciseType] || exerciseType.replaceAll('_', ' ');
+    allQuestions.forEach((question) => addQuestion(question, exerciseType, partLabel));
+    return Array.from(groupMap.values());
+  }, [allQuestions, combinedItems, exerciseType, isCombined]);
+
   const totalItems = isCombined ? combinedItems.length : (isGrouped ? groups.length : questions.length);
 
   const handleAnswer = useCallback((questionId, option) => {
@@ -937,17 +1285,40 @@ const QuizPage = () => {
     setSubmitNotice('');
   }, [answers, submitResult]);
 
-  const handlePrev = () => {
-    setCurrentIndex((index) => Math.max(0, index - 1));
-  };
+  const findReviewIndex = useCallback((startIndex, direction) => {
+    if (!isCombined) return Math.max(0, Math.min(totalItems - 1, startIndex));
+    let nextIndex = startIndex;
+    while (nextIndex >= 0 && nextIndex < totalItems) {
+      const item = combinedItems[nextIndex];
+      if (item?.kind !== 'intro' && item?.questions?.length > 0) return nextIndex;
+      nextIndex += direction;
+    }
+    return currentIndex;
+  }, [combinedItems, currentIndex, isCombined, totalItems]);
 
-  const handleNext = () => {
-    setCurrentIndex((index) => Math.min(totalItems - 1, index + 1));
-  };
+  const handlePrev = useCallback(() => {
+    setCurrentIndex((index) => {
+      const target = index - 1;
+      return answerReviewMode ? findReviewIndex(target, -1) : Math.max(0, target);
+    });
+  }, [answerReviewMode, findReviewIndex]);
+
+  const handleNext = useCallback(() => {
+    setCurrentIndex((index) => {
+      const target = index + 1;
+      return answerReviewMode ? findReviewIndex(target, 1) : Math.min(totalItems - 1, target);
+    });
+  }, [answerReviewMode, findReviewIndex, totalItems]);
+
+  const handleListeningEnded = useCallback(() => {
+    if (submitResult) return;
+    handleNext();
+  }, [handleNext, submitResult]);
 
   const getItemLabel = (idx) => {
     if (isCombined) {
       const item = combinedItems[idx];
+      if (item?.kind === 'intro') return item.partLabel + ' • Hướng dẫn';
       const questionNumbers = item?.questions?.map((question) => question.questionNumber);
       if (!item || !questionNumbers || questionNumbers.length === 0) return 'Mục ' + (idx + 1);
       const questionLabel = questionNumbers.length === 1
@@ -982,7 +1353,21 @@ const QuizPage = () => {
     return '';
   };
 
+  const isQuestionNavigable = (question) => {
+    if (!question) return false;
+    if (answerReviewMode) return true;
+    const activeExerciseType = isCombined ? currentCombinedItem?.exerciseType : exerciseType;
+    if (isListeningExerciseType(activeExerciseType)) return false;
+
+    if (isCombined) {
+      const item = combinedItems.find((combinedItem) => combinedItem.questions?.some((itemQuestion) => itemQuestion.id === question.id));
+      return isReadingExerciseType(item?.exerciseType);
+    }
+    return isReadingExerciseType(exerciseType);
+  };
+
   const handleGridClick = (question) => {
+    if (!isQuestionNavigable(question)) return;
     if (isCombined) {
       const itemIndex = combinedItems.findIndex((item) => item.questions?.some((itemQuestion) => itemQuestion.id === question.id));
       if (itemIndex >= 0) setCurrentIndex(itemIndex);
@@ -1024,39 +1409,52 @@ const QuizPage = () => {
       const item = currentCombinedItem;
       if (!item) return null;
 
+      if (item.kind === 'intro') {
+        return (
+          <ListeningPartIntroLayout
+            intro={item.intro}
+            firstGroup={item.firstGroup}
+            onComplete={handleListeningEnded}
+            enableAudio={isListeningExerciseType(item.exerciseType)}
+          />
+        );
+      }
+
       switch (item.exerciseType) {
         case 'LISTENING_PART1':
-          return <ListeningPart1Layout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+          return <ListeningPart1Layout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} autoPlay={!answerReviewMode} lockedAudio={!answerReviewMode} onAudioEnded={answerReviewMode ? undefined : handleListeningEnded} />;
         case 'LISTENING_PART2':
-          return <ListeningPart2Layout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+          return <ListeningPart2Layout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} autoPlay={!answerReviewMode} lockedAudio={!answerReviewMode} onAudioEnded={answerReviewMode ? undefined : handleListeningEnded} />;
         case 'LISTENING_PART3':
         case 'LISTENING_PART4':
-          return <ListeningGroupLayout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+          return <ListeningGroupLayout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} autoPlay={!answerReviewMode} lockedAudio={!answerReviewMode} onAudioEnded={answerReviewMode ? undefined : handleListeningEnded} />;
         case 'READING_PART6':
         case 'READING_PART7':
-          return <ReadingPassageLayout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
-        case 'GRAMMAR':
+          return <ReadingPassageLayout groups={[item.group]} currentGroupIndex={0} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
         case 'READING_PART5':
+          return <ReadingPart5Layout questions={[item.question]} currentIndex={0} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
+        case 'GRAMMAR':
         default:
-          return <GrammarLayout questions={[item.question]} currentIndex={0} setCurrentIndex={setCurrentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+          return <GrammarLayout questions={[item.question]} currentIndex={0} setCurrentIndex={setCurrentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
       }
     }
 
     switch (exerciseType) {
       case 'LISTENING_PART1':
-        return <ListeningPart1Layout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+        return <ListeningPart1Layout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
       case 'LISTENING_PART2':
-        return <ListeningPart2Layout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+        return <ListeningPart2Layout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
       case 'LISTENING_PART3':
       case 'LISTENING_PART4':
-        return <ListeningGroupLayout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+        return <ListeningGroupLayout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
       case 'READING_PART6':
       case 'READING_PART7':
-        return <ReadingPassageLayout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
-      case 'GRAMMAR':
+        return <ReadingPassageLayout groups={groups} currentGroupIndex={currentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
       case 'READING_PART5':
+        return <ReadingPart5Layout questions={questions} currentIndex={currentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
+      case 'GRAMMAR':
       default:
-        return <GrammarLayout questions={questions} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} answers={answers} showAnswer={showAnswer} handleAnswer={handleAnswer} />;
+        return <GrammarLayout questions={questions} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} answers={answers} showAnswer={answerReviewMode} handleAnswer={handleAnswer} />;
     }
   };
 
@@ -1084,14 +1482,47 @@ const QuizPage = () => {
   const currentQuestionLabel = getItemLabel(currentIndex);
   const partName = exercise.topicName || exercise.title || 'Đề thi TOEIC online';
   const exerciseTypeLabel = isCombined ? 'Listening + Reading' : exerciseType.replaceAll('_', ' ');
+  const currentItemIsIntro = currentCombinedItem?.kind === 'intro';
+  const currentDisplayType = isCombined ? currentCombinedItem?.exerciseType : exerciseType;
+  const currentPartHeading = (() => {
+    if (currentItemIsIntro) return currentCombinedItem?.intro?.title || 'HƯỚNG DẪN';
+    const match = currentDisplayType?.match(/PART(\d)/);
+    return match ? `PART ${match[1]}` : 'PART 1';
+  })();
+  const currentItemIsListening = isCombined
+    ? isListeningExerciseType(currentCombinedItem?.exerciseType)
+    : isListeningExerciseType(exerciseType);
+  const currentItemIsReading = isCombined
+    ? isReadingExerciseType(currentCombinedItem?.exerciseType)
+    : isReadingExerciseType(exerciseType);
+  const reviewPrevIndex = answerReviewMode ? findReviewIndex(currentIndex - 1, -1) : Math.max(0, currentIndex - 1);
+  const reviewNextIndex = answerReviewMode ? findReviewIndex(currentIndex + 1, 1) : Math.min(totalItems - 1, currentIndex + 1);
+  const disablePrevNav = answerReviewMode ? reviewPrevIndex === currentIndex : currentIndex === 0;
+  const disableNextNav = answerReviewMode ? reviewNextIndex === currentIndex : currentIndex === totalItems - 1;
   const showDictationButton = !isCombined && (
     exerciseType === 'LISTENING_PART1' ||
     exerciseType === 'LISTENING_PART2' ||
     exerciseType === 'LISTENING_PART3' ||
     exerciseType === 'LISTENING_PART4'
   );
+  const handleRestart = () => {
+    setAnswers({});
+    setShowAnswer(false);
+    setAnswerReviewMode(false);
+    setSubmitResult(null);
+    setResultModalOpen(false);
+    setIncompleteModalOpen(false);
+    setShowPartBreakdown(false);
+    setCurrentIndex(0);
+    setRemainingSeconds(120 * 60);
+  };
 
-  const handleSubmit = () => {
+  const handleSubmit = (force = false) => {
+    if (!force && answeredCount < allQuestions.length) {
+      setIncompleteModalOpen(true);
+      return;
+    }
+
     const correctCount = allQuestions.filter((question) => answers[question.id] === question.correctAnswer).length;
     const totalCount = allQuestions.length;
     const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -1110,8 +1541,28 @@ const QuizPage = () => {
 
     const listeningCorrect = listeningQuestions.filter((question) => answers[question.id] === question.correctAnswer).length;
     const readingCorrect = readingQuestions.filter((question) => answers[question.id] === question.correctAnswer).length;
+    const listeningScore = listeningQuestions.length > 0
+      ? Math.max(5, Math.round((listeningCorrect / listeningQuestions.length) * 100))
+      : 0;
+    const readingScore = readingQuestions.length > 0
+      ? Math.max(5, Math.round((readingCorrect / readingQuestions.length) * 100))
+      : 0;
+    const partBreakdown = Array.from({ length: 7 }, (_, index) => {
+      const partNumber = index + 1;
+      const partQuestions = allQuestions.filter((question) => {
+        if (!isCombined) return exerciseType === `LISTENING_PART${partNumber}` || exerciseType === `READING_PART${partNumber}`;
+        const item = combinedItems.find((combinedItem) => combinedItem.questions?.some((itemQuestion) => itemQuestion.id === question.id));
+        return item?.exerciseType === `LISTENING_PART${partNumber}` || item?.exerciseType === `READING_PART${partNumber}`;
+      });
+      return {
+        part: partNumber,
+        correct: partQuestions.filter((question) => answers[question.id] === question.correctAnswer).length,
+        total: partQuestions.length,
+      };
+    });
 
     setShowAnswer(false);
+    setAnswerReviewMode(false);
     setSubmitResult({
       correctCount,
       totalCount,
@@ -1119,14 +1570,21 @@ const QuizPage = () => {
       score,
       listeningCorrect,
       listeningTotal: listeningQuestions.length,
+      listeningScore,
       readingCorrect,
       readingTotal: readingQuestions.length,
+      readingScore,
+      totalToeicScore: listeningScore + readingScore,
+      partBreakdown,
     });
-    setSubmitNotice('Đã nộp bài thành công. Kết quả của bạn được hiển thị bên dưới.');
+    setSubmitNotice('');
+    setIncompleteModalOpen(false);
+    setShowPartBreakdown(false);
+    setResultModalOpen(true);
   };
 
   return (
-    <div className="quiz-layout zen-exam-layout">
+    <div className={`quiz-layout zen-exam-layout toeic-exam-skin ${currentItemIsReading && !currentItemIsIntro ? 'reading-exam-skin' : ''} ${answerReviewMode ? 'answer-review-skin' : ''}`}>
       <div className="zen-exam-topbar">
         <div className="zen-exam-brand">
           <span className="zen-exam-mark">TOEIC</span>
@@ -1136,7 +1594,28 @@ const QuizPage = () => {
           </div>
         </div>
         <div className="zen-exam-actions">
-          <button className="zen-action primary" onClick={handleSubmit}>Nộp bài</button>
+          {answerReviewMode ? (
+            <>
+              <button className="zen-action review" onClick={handleRestart}>Làm lại</button>
+              <button className="zen-action review" onClick={() => navigate('/online-tests')}>Thoát</button>
+            </>
+          ) : (
+            <>
+              <button className="zen-action primary" onClick={() => handleSubmit()}>Nộp bài</button>
+              <div className="toeic-header-timer">{timeText}</div>
+            </>
+          )}
+          <div className="toeic-header-user">{user?.fullName || 'Guest (khách)'}</div>
+          <button
+            className="toeic-header-grid"
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Mở bảng câu hỏi"
+          >
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+          </button>
           <button className="zen-action subtle" onClick={() => navigate(-1)}>Thoát</button>
         </div>
       </div>
@@ -1170,37 +1649,28 @@ const QuizPage = () => {
 
           {sidebarOpen && (
             <div className="zen-sidebar-content">
-              <div className="zen-part-card">
-                <span>Đề thi online</span>
-                <strong>{exerciseTypeLabel}</strong>
-                <p>{currentQuestionLabel}</p>
-              </div>
-
-              <div className="zen-note">
-                <strong>Lưu ý</strong>
-                <p>Bài thi online không hiển thị đáp án trong quá trình làm bài. Hãy kiểm tra lại lựa chọn trước khi nộp.</p>
-              </div>
-
-              <div className="zen-question-map">
-                <div className="zen-map-title">Câu hỏi</div>
-                <div className="question-grid zen-grid">
-                  {allQuestions.map((question, index) => (
-                    <button
-                      key={question.id}
-                      className={'grid-btn ' + getQuestionGridStatus(question)}
-                      onClick={() => handleGridClick(question)}
-                      aria-label={'Đi tới câu ' + (index + 1)}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="zen-map-legend">
-                <span><i className="legend-current"></i>Đang làm</span>
-                <span><i className="legend-answered"></i>Đã chọn</span>
-                <span><i></i>Chưa làm</span>
+              <div className="toeic-drawer-map">
+                {questionPartGroups.map((partGroup) => (
+                  <section className="toeic-drawer-part" key={partGroup.partLabel}>
+                    <div className="toeic-drawer-title">{partGroup.partLabel}</div>
+                    <div className="toeic-drawer-grid">
+                      {partGroup.questions.map((question) => {
+                        const navigable = isQuestionNavigable(question);
+                        return (
+                          <button
+                            key={question.id}
+                            className={'toeic-drawer-question ' + getQuestionGridStatus(question) + (!navigable ? ' locked' : '')}
+                            onClick={() => handleGridClick(question)}
+                            disabled={!navigable}
+                            aria-label={(navigable ? 'Đi tới câu ' : 'Câu Listening bị khóa ') + question.questionNumber}
+                          >
+                            {question.questionNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
             </div>
           )}
@@ -1210,44 +1680,25 @@ const QuizPage = () => {
           <section className="zen-exam-intro">
             <div>
               <button className="zen-back-link" onClick={() => navigate(-1)}>← Quay lại</button>
-              <h1>Đề thi online</h1>
+              <h1>{currentPartHeading}</h1>
               <p>{getExerciseTitle()} • {allQuestions.length} câu • {exerciseTypeLabel}</p>
             </div>
-            <div className="zen-current-chip">{currentQuestionLabel}</div>
+            {(answerReviewMode || currentItemIsReading) && !currentItemIsIntro && (
+              <div className="reading-top-nav">
+                <button className="reading-nav-btn" onClick={handlePrev} disabled={disablePrevNav}>
+                  <span className="reading-nav-icon">←</span>
+                  <span>Câu trước</span>
+                </button>
+                <button className="reading-nav-btn" onClick={handleNext} disabled={disableNextNav}>
+                  <span>Câu tiếp</span>
+                  <span className="reading-nav-icon">→</span>
+                </button>
+              </div>
+            )}
+            <div className="toeic-score-box">{answeredCount}/200</div>
           </section>
 
           {submitNotice && <div className="zen-submit-notice">{submitNotice}</div>}
-
-          {submitResult && (
-            <section className="zen-result-card">
-              <div className="zen-result-score">
-                <span>Điểm</span>
-                <strong>{submitResult.score}/100</strong>
-              </div>
-              <div className="zen-result-grid">
-                <div>
-                  <span>Số câu đúng</span>
-                  <strong>{submitResult.correctCount}/{submitResult.totalCount}</strong>
-                </div>
-                <div>
-                  <span>Đã trả lời</span>
-                  <strong>{submitResult.answered}/{submitResult.totalCount}</strong>
-                </div>
-                {submitResult.listeningTotal > 0 && (
-                  <div>
-                    <span>Listening</span>
-                    <strong>{submitResult.listeningCorrect}/{submitResult.listeningTotal}</strong>
-                  </div>
-                )}
-                {submitResult.readingTotal > 0 && (
-                  <div>
-                    <span>Reading</span>
-                    <strong>{submitResult.readingCorrect}/{submitResult.readingTotal}</strong>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
 
           {showDictationButton && (
             <div className="quiz-toolbar mock-toolbar zen-exam-toolbar">
@@ -1259,14 +1710,16 @@ const QuizPage = () => {
 
           <section className="zen-question-stage">{renderExerciseContent()}</section>
 
-          <div className="quiz-nav-grid-container zen-bottom-nav">
-            <button className="quiz-nav-btn" onClick={handlePrev} disabled={currentIndex === 0}>← Câu trước</button>
-            <div className="zen-bottom-count">
-              <span>{currentQuestionLabel}</span>
-              <strong>{progressPercent}% hoàn thành</strong>
+          {!currentItemIsListening && !currentItemIsReading && !currentItemIsIntro && (
+            <div className="quiz-nav-grid-container zen-bottom-nav">
+              <button className="quiz-nav-btn" onClick={handlePrev} disabled={disablePrevNav}>← Câu trước</button>
+              <div className="zen-bottom-count">
+                <span>{currentQuestionLabel}</span>
+                <strong>{progressPercent}% hoàn thành</strong>
+              </div>
+              <button className="quiz-nav-btn" onClick={handleNext} disabled={disableNextNav}>Câu tiếp →</button>
             </div>
-            <button className="quiz-nav-btn" onClick={handleNext} disabled={currentIndex === totalItems - 1}>Câu tiếp →</button>
-          </div>
+          )}
 
           {exercise.nextTopicName && (
             <button className="quiz-finish-next-btn" onClick={() => navigate('/topics/' + exercise.nextTopicSlug)}>
@@ -1275,6 +1728,69 @@ const QuizPage = () => {
           )}
         </main>
       </div>
+
+      {incompleteModalOpen && (
+        <div className="toeic-result-overlay" role="dialog" aria-modal="true" aria-labelledby="toeic-incomplete-title">
+          <section className="toeic-result-modal toeic-incomplete-modal">
+            <div className="toeic-result-title" id="toeic-incomplete-title">HOÀN THÀNH BÀI KIỂM TRA</div>
+            <div className="toeic-result-body toeic-incomplete-body">
+              <p>Bạn đã hoàn thành {answeredCount}/{allQuestions.length} câu hỏi. Hoàn thành tất cả trước khi gửi bài.</p>
+            </div>
+            <div className="toeic-result-actions toeic-incomplete-actions">
+              <button className="toeic-result-submit-now" type="button" onClick={() => handleSubmit(true)}>
+                GỬI BÀI NGAY
+              </button>
+              <button className="toeic-result-close" type="button" onClick={() => setIncompleteModalOpen(false)}>
+                ĐÓNG
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {submitResult && resultModalOpen && (
+        <div className="toeic-result-overlay" role="dialog" aria-modal="true" aria-labelledby="toeic-result-title">
+          <section className="toeic-result-modal">
+            <div className="toeic-result-title" id="toeic-result-title">HOÀN THÀNH BÀI KIỂM TRA</div>
+            <div className="toeic-result-body">
+              <p>Bài kiểm tra của bạn đã được xử lý. Hãy chụp lại màn hình kết quả vì nó sẽ chỉ hiển thị 1 lần. Kết quả:</p>
+              <p><strong>Số câu đúng: {submitResult.correctCount}/{submitResult.totalCount}</strong></p>
+              <p><strong>Listening: {submitResult.listeningCorrect}/{submitResult.listeningTotal || 100} - {submitResult.listeningScore} điểm</strong></p>
+              <p><strong>Reading: {submitResult.readingCorrect}/{submitResult.readingTotal || 100} - {submitResult.readingScore} điểm</strong></p>
+              <p><strong>Tổng điểm: {submitResult.totalToeicScore} điểm</strong></p>
+              {showPartBreakdown && (
+                <div className="toeic-part-breakdown">
+                  {submitResult.partBreakdown?.map((part) => (
+                    <p key={part.part}><strong>Part {part.part}: {part.correct}/{part.total}</strong></p>
+                  ))}
+                </div>
+              )}
+              <button className="toeic-result-link" type="button" onClick={() => setShowPartBreakdown(true)}>
+                Xem số câu đúng mỗi part
+              </button>
+            </div>
+            <div className="toeic-result-actions">
+              <button
+                className="toeic-result-answer"
+                type="button"
+                onClick={() => {
+                  setShowAnswer(true);
+                  setAnswerReviewMode(true);
+                  if (currentCombinedItem?.kind === 'intro') {
+                    setCurrentIndex(findReviewIndex(currentIndex + 1, 1));
+                  }
+                  setResultModalOpen(false);
+                }}
+              >
+                XEM ĐÁP ÁN
+              </button>
+              <button className="toeic-result-close" type="button" onClick={() => navigate('/online-tests')}>
+                ĐÓNG
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };
