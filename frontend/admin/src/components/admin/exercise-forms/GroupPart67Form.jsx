@@ -4,6 +4,9 @@ import NestedQuestionList from './NestedQuestionList';
 import FileUploadInput from '../../common/FileUploadInput';
 import { getTopicsBySection } from '../../../services/api';
 
+const emptyQuestion = { questionNumber: 1, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' };
+const emptyImageBlock = { blockType: 'IMAGE', content: '', imageUrl: '', orderIndex: 1 };
+
 const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, sectionId, sectionSlug, topicSlug }) => {
   const [topics, setTopics] = useState([]);
   const [formData, setFormData] = useState({
@@ -13,18 +16,18 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
     audioUrl: '',
     imageUrl: '', 
     passage: '',
-    contentBlocks: [],
-    questions: []
+    contentBlocks: [emptyImageBlock],
+    questions: [emptyQuestion]
   });
 
   useEffect(() => {
     if (initialData) {
-      const qs = initialData.questions && initialData.questions.length > 0 
-        ? initialData.questions 
-        : [{ questionNumber: 1, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' }];
+      const qs = initialData.questions && initialData.questions.length > 0
+        ? initialData.questions
+        : [emptyQuestion];
       const cb = initialData.contentBlocks && initialData.contentBlocks.length > 0
         ? initialData.contentBlocks.sort((a,b) => a.orderIndex - b.orderIndex)
-        : [];
+        : (initialData.imageUrl ? [{ blockType: 'IMAGE', content: '', imageUrl: initialData.imageUrl, orderIndex: 1 }] : [emptyImageBlock]);
       setFormData({ ...formData, ...initialData, questions: qs, contentBlocks: cb, sourceTopicId: initialData.sourceTopicId || '' });
     }
   }, [initialData]);
@@ -48,7 +51,7 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
       ...prev,
       questions: [
         ...prev.questions,
-        { questionNumber: prev.questions.length + 1, content: '', optionA: '', optionB: '', optionC: '', optionD: '', correctAnswer: 'A', explanation: '' }
+        { ...emptyQuestion, questionNumber: prev.questions.length + 1 }
       ]
     }));
   };
@@ -78,6 +81,8 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
     });
   };
 
+  const handleAddImageBlock = () => handleAddContentBlock('IMAGE');
+
   const handleContentBlockChange = (index, field, value) => {
     setFormData(prev => {
       const blocks = [...(prev.contentBlocks || [])];
@@ -98,8 +103,13 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!hasLegacyContent && (!formData.contentBlocks || formData.contentBlocks.length === 0)) {
-      alert("Vui lòng thêm ít nhất một đoạn Text hoặc Hình ảnh cho Nội dung bài đọc.");
+    const hasImageBlocks = formData.contentBlocks && formData.contentBlocks.some(b => b.blockType === 'IMAGE' && b.imageUrl);
+    if (!hasLegacyContent && !hasImageBlocks) {
+      alert("Vui lòng tải ít nhất một ảnh cho Part 6/7.");
+      return;
+    }
+    if (formData.contentBlocks && formData.contentBlocks.some(b => b.blockType === 'TEXT')) {
+      alert("Part 6/7 hiện chỉ dùng ảnh, vui lòng xóa các block text.");
       return;
     }
     onSave(formData);
@@ -144,42 +154,28 @@ const GroupPart67Form = ({ initialData, onSave, onCancel, isPracticeTopic, secti
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <label style={{...styles.label, marginBottom: 0, color: '#2980b9', fontSize: '1.1rem'}}>Nội dung bài đọc (Content Blocks)</label>
           <div style={{ display: 'flex', gap: '10px' }}>
-             <button type="button" onClick={() => handleAddContentBlock('TEXT')} className="btn" style={{ padding: '6px 12px', backgroundColor: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', fontWeight: 'bold' }}>+ Thêm Đoạn Text</button>
-             <button type="button" onClick={() => handleAddContentBlock('IMAGE')} className="btn" style={{ padding: '6px 12px', backgroundColor: '#e1f5fe', color: '#0277bd', border: '1px solid #81d4fa', fontWeight: 'bold' }}>+ Thêm Hình Ảnh</button>
+             <button type="button" onClick={handleAddImageBlock} className="btn" style={{ padding: '6px 12px', backgroundColor: '#e1f5fe', color: '#0277bd', border: '1px solid #81d4fa', fontWeight: 'bold' }}>+ Thêm Hình Ảnh</button>
           </div>
         </div>
 
         {formData.contentBlocks && formData.contentBlocks.map((block, idx) => (
           <div key={idx} style={{ padding: '15px', border: '1px solid #ced4da', borderRadius: '6px', marginBottom: '15px', backgroundColor: '#fff', position: 'relative' }}>
              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
-               <strong style={{ color: block.blockType === 'TEXT' ? '#2e7d32' : '#0277bd', fontSize: '1.05rem' }}>
-                 Block {idx + 1}: {block.blockType === 'TEXT' ? 'Văn bản (Text)' : 'Hình ảnh (Image)'}
+               <strong style={{ color: '#0277bd', fontSize: '1.05rem' }}>
+                 Block {idx + 1}: Hình ảnh (Image)
                </strong>
                <button type="button" onClick={() => handleRemoveContentBlock(idx)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontWeight: 'bold', padding: '5px' }}>✕ Xóa</button>
              </div>
-             {block.blockType === 'TEXT' ? (
-                <textarea 
-                  value={block.content || ''} 
-                  onChange={(e) => handleContentBlockChange(idx, 'content', e.target.value)} 
-                  rows={6} 
-                  style={{...styles.input, resize: 'vertical', fontFamily: 'inherit'}} 
-                  placeholder="Nhập nội dung đoạn văn..."
-                  required={!hasLegacyContent}
+                 <FileUploadInput
+                   name={`cb_img_${idx}`}
+                   value={block.imageUrl || ''}
+                   onChange={(e) => handleContentBlockChange(idx, 'imageUrl', e.target.value)}
+                   placeholder="https://..."
+                   accept="image/*"
+                   fileName={fileNamePrefix ? `${fileNamePrefix}_block${idx}_img` : null}
+                   subPath="exercises/part67/images"
                 />
-             ) : (
-                <>
-                  <FileUploadInput 
-                     name={`cb_img_${idx}`} 
-                     value={block.imageUrl || ''} 
-                     onChange={(e) => handleContentBlockChange(idx, 'imageUrl', e.target.value)} 
-                     placeholder="https://..." 
-                     accept="image/*" 
-                     fileName={fileNamePrefix ? `${fileNamePrefix}_block${idx}_img` : null} 
-                     subPath="exercises/part67/images" 
-                  />
-                  <MediaPreview imageUrl={block.imageUrl} />
-                </>
-             )}
+                <MediaPreview imageUrl={block.imageUrl} />
           </div>
         ))}
         {(!formData.contentBlocks || formData.contentBlocks.length === 0) && (

@@ -1,0 +1,115 @@
+.submit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.submit-modal-container {
+  background-color: white;
+  width: 90%;
+  max-width: 600px;
+  border-radius: 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh; /* Prevent modal from exceeding screen height */
+}
+
+.submit-modal-header {
+  background-color: #0c4a6e;
+  padding: 1rem 1.5rem;
+}
+
+.submit-modal-header h2 {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.submit-modal-body {
+  padding: 1.5rem;
+  color: #334155;
+  overflow-y: auto; /* Enable scrolling within body if parts list is long */
+}
+
+.submit-modal-warning {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.submit-modal-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.submit-modal-stat-item {
+  margin: 0;
+}
+
+.submit-modal-stat-item strong {
+  font-weight: 700;
+  color: #475569;
+}
+
+.submit-modal-parts-toggle {
+  cursor: pointer;
+  color: #334155;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.submit-modal-divider {
+  border: 0;
+  border-top: 1px solid #0c4a6e;
+  margin: 0 0 1rem 0;
+}
+
+.submit-modal-parts-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.submit-modal-footer {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.submit-modal-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: white;
+  transition: opacity 0.2s;
+}
+
+.submit-modal-btn:hover {
+  opacity: 0.9;
+}
+
+.submit-modal-btn--blue {
+  background-color: #1d4ed8;
+}
+
+.submit-modal-btn--red {
+  background-color: #ef4444;
+}

@@ -24,7 +24,13 @@ public class ExerciseRequest {
     private Integer orderIndex;
 
     private Boolean isActive;
-    
+    private String fullAudioUrl;
+    private Integer audioDurationMs;
+    private String audioVersion;
+    private String readingImageMode;
+    private String readingImageUrl;
+    private String readingImageUrls;
+
     // Used when creating exercise from Admin controllers
     private Long topicId;
 }

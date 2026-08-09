@@ -13,6 +13,9 @@ public class ExerciseQuestionGroupDto {
     private Long id;
     private Integer orderIndex;
     private String audioUrl;
+    private Integer audioStartMs;
+    private Integer audioEndMs;
+    private String timelineLabel;
     private String imageUrl;
     private String passage;
     private Long exerciseId;

@@ -16,8 +16,13 @@ import FlashcardMatchPage from './pages/FlashcardMatchPage';
 import FlashcardFillPage from './pages/FlashcardFillPage';
 import FlashcardDictationPage from './pages/FlashcardDictationPage';
 import FlashcardListenPage from './pages/FlashcardListenPage';
-import PracticePage from './pages/PracticePage';
+
 import DictationPage from './pages/DictationPage';
+import ExamListPage from './pages/ExamListPage';
+import ExamDetailPage from './pages/ExamDetailPage';
+import ExamPartIntroPage from './pages/ExamPartIntroPage';
+import ExamTakingPage from './pages/ExamTakingPage';
+import ExamReviewPage from './pages/ExamReviewPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './index.css';
 import './flashcard.css';
@@ -28,9 +33,12 @@ const PrivateRoute = ({ children }) => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  const hideHeader = location.pathname.includes('/take') || location.pathname.includes('/taking') || location.pathname.includes('/review');
+
   return (
     <div className="app-container">
-      <Header />
+      {!hideHeader && <Header />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -76,13 +84,39 @@ function AppContent() {
           </PrivateRoute>
         } />
 
-        {/* Trang luyện tập tổng hợp */}
-        <Route path="/practice/:sectionSlug" element={
+        {/* ===== Exam Routes ===== */}
+        <Route path="/exams" element={
           <PrivateRoute>
-            <PracticePage />
+            <div className="main-layout">
+              <Sidebar />
+              <ExamListPage />
+            </div>
           </PrivateRoute>
         } />
 
+        <Route path="/exams/:id" element={
+          <PrivateRoute>
+            <ExamDetailPage />
+          </PrivateRoute>
+        } />
+
+        <Route path="/exams/:id/take" element={
+          <PrivateRoute>
+            <ExamPartIntroPage />
+          </PrivateRoute>
+        } />
+
+        <Route path="/exams/:id/taking" element={
+          <PrivateRoute>
+            <ExamTakingPage />
+          </PrivateRoute>
+        } />
+
+        <Route path="/exams/:id/review" element={
+          <PrivateRoute>
+            <ExamReviewPage />
+          </PrivateRoute>
+        } />
         {/* ===== Flashcard Routes ===== */}
         <Route path="/flashcards" element={
           <PrivateRoute>

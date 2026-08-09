@@ -25,6 +25,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ExerciseQuestion extends BaseEntity {
     private Integer questionNumber;
+    private Integer audioStartMs;
+    private Integer audioEndMs;
     @Column(columnDefinition = "TEXT")
     private String content;
     @Column(name = "option_a")

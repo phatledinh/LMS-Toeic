@@ -39,6 +39,8 @@ public class ExerciseQuestionService {
 
         ExerciseQuestion question = ExerciseQuestion.builder()
                 .questionNumber(request.getQuestionNumber())
+                .audioStartMs(request.getAudioStartMs())
+                .audioEndMs(request.getAudioEndMs())
                 .content(request.getContent())
                 .optionA(request.getOptionA())
                 .optionB(request.getOptionB())
@@ -66,6 +68,8 @@ public class ExerciseQuestionService {
         return ExerciseQuestionDto.builder()
                 .id(question.getId())
                 .questionNumber(question.getQuestionNumber())
+                .audioStartMs(question.getAudioStartMs())
+                .audioEndMs(question.getAudioEndMs())
                 .content(question.getContent())
                 .optionA(question.getOptionA())
                 .optionB(question.getOptionB())

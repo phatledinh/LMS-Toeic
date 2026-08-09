@@ -14,6 +14,12 @@ public class ExerciseDto {
     private String exerciseType;
 
     private Integer orderIndex;
+    private String fullAudioUrl;
+    private Integer audioDurationMs;
+    private String audioVersion;
+    private String readingImageMode;
+    private String readingImageUrl;
+    private String readingImageUrls;
     private java.util.List<ExerciseQuestionDto> questions;
     private java.util.List<ExerciseQuestionGroupDto> questionGroups;
 }

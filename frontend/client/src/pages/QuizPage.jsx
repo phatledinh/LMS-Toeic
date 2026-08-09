@@ -7,7 +7,7 @@ import Header from '../components/Header';
 // ==================== Sub-components ====================
 
 /** Audio Player dùng chung cho Listening */
-export const AudioPlayer = ({ audioUrl, label }) => {
+export const AudioPlayer = ({ audioUrl, startMs = 0, endMs = null, label }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -20,6 +20,9 @@ export const AudioPlayer = ({ audioUrl, label }) => {
 
   if (!audioUrl) return null;
   const fullUrl = getFullUrl(audioUrl);
+  const segmentStart = (startMs || 0) / 1000;
+  const segmentEnd = endMs ? endMs / 1000 : null;
+  const segmentDuration = segmentEnd != null ? Math.max(segmentEnd - segmentStart, 0) : null;
 
   const formatTime = (time) => {
     if (isNaN(time)) return "00:00";
@@ -28,38 +31,66 @@ export const AudioPlayer = ({ audioUrl, label }) => {
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsPlaying(true);
-          }).catch(error => {
-            console.error("Error playing audio:", error);
-            setIsPlaying(false);
-          });
-        } else {
-          setIsPlaying(true);
-        }
+  const syncToSegmentStart = (play = false) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = segmentStart;
+    setCurrentTime(0);
+    if (play) {
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       }
     }
   };
 
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+    if (audioRef.current.currentTime < segmentStart || (segmentEnd != null && audioRef.current.currentTime >= segmentEnd)) {
+      audioRef.current.currentTime = segmentStart;
+    }
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => setIsPlaying(true)).catch(error => {
+        console.error("Error playing audio:", error);
+        setIsPlaying(false);
+      });
+    } else {
+      setIsPlaying(true);
+    }
+  };
+
   const handleTimeUpdate = () => {
-    setCurrentTime(audioRef.current.currentTime);
+    if (!audioRef.current) return;
+    const rawTime = audioRef.current.currentTime;
+    if (segmentEnd != null && rawTime >= segmentEnd) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = segmentEnd;
+      setCurrentTime(segmentDuration || 0);
+      setIsPlaying(false);
+      return;
+    }
+    setCurrentTime(Math.max(rawTime - segmentStart, 0));
   };
 
   const handleLoadedMetadata = () => {
-    setDuration(audioRef.current.duration);
+    if (!audioRef.current) return;
+    setDuration(segmentDuration != null ? segmentDuration : audioRef.current.duration);
+    if (audioRef.current.currentTime < segmentStart || audioRef.current.currentTime === 0) {
+      audioRef.current.currentTime = segmentStart;
+      setCurrentTime(0);
+    }
   };
 
   const handleSeek = (e) => {
+    if (!audioRef.current) return;
     const time = Number(e.target.value);
-    audioRef.current.currentTime = time;
+    const absolute = segmentStart + time;
+    audioRef.current.currentTime = absolute;
     setCurrentTime(time);
   };
 
@@ -100,22 +131,10 @@ export const AudioPlayer = ({ audioUrl, label }) => {
   };
 
   const handleReload = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          setIsPlaying(true);
-        }).catch(error => {
-          console.error("Error reloading audio:", error);
-          setIsPlaying(false);
-        });
-      } else {
-        setIsPlaying(true);
-      }
-      setShowSpeedMenu(false);
-    }
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    syncToSegmentStart(true);
+    setShowSpeedMenu(false);
   };
 
   const speedOptions = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
@@ -150,9 +169,7 @@ export const AudioPlayer = ({ audioUrl, label }) => {
         onChange={handleSeek}
         style={{ '--progress': `${(currentTime / (duration || 1)) * 100}%` }}
       />
-      <span className="audio-time">
-        {formatTime(currentTime)}
-      </span>
+      <span className="audio-time">{formatTime(currentTime)}{segmentDuration != null ? ` / ${formatTime(segmentDuration)}` : ''}</span>
       <div className="audio-volume-control">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368" onClick={toggleMute} style={{cursor: 'pointer'}}>
           {isMuted || volume === 0 ? (
@@ -182,8 +199,8 @@ export const AudioPlayer = ({ audioUrl, label }) => {
             <div className="audio-speed-menu">
               <div className="speed-menu-header">Speed</div>
               {speedOptions.map(rate => (
-                <div 
-                  key={rate} 
+                <div
+                  key={rate}
                   className={`speed-option ${playbackRate === rate ? 'active' : ''}`}
                   onClick={() => changeSpeed(rate)}
                 >
@@ -335,7 +352,7 @@ export const ListeningPart1Layout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout">
       <div className="mock-audio-row">
-        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} />
+        <AudioPlayer audioUrl={group.audioUrl} startMs={group.audioStartMs} endMs={group.audioEndMs} label={`Câu ${question?.questionNumber || ''}`} />
       </div>
       <div className="mock-split-row">
         <div className="mock-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -421,7 +438,7 @@ export const ListeningPart2Layout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout">
       <div className="mock-audio-row">
-        <AudioPlayer audioUrl={group.audioUrl} label={`Câu ${question?.questionNumber || ''}`} />
+        <AudioPlayer audioUrl={group.audioUrl} startMs={group.audioStartMs} endMs={group.audioEndMs} label={`Câu ${question?.questionNumber || ''}`} />
       </div>
       <div className="mock-split-row" style={{ display: 'block' }}>
         <div className="mock-question-container" style={{ width: '100%' }}>
@@ -477,7 +494,7 @@ export const ListeningGroupLayout = ({ groups, currentGroupIndex, answers, showA
   return (
     <div className="part1-mock-layout" style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '0' }}>
       <div className="mock-audio-row" style={{ paddingBottom: '16px', marginBottom: '16px' }}>
-        <AudioPlayer audioUrl={group.audioUrl} label={`Nhóm ${currentGroupIndex + 1}`} />
+        <AudioPlayer audioUrl={group.audioUrl} startMs={group.audioStartMs} endMs={group.audioEndMs} label={`Nhóm ${currentGroupIndex + 1}`} />
       </div>
       <div className="mock-split-row" style={{ alignItems: 'flex-start', gap: '24px' }}>
         <div className="mock-left-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

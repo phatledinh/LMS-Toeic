@@ -32,6 +32,9 @@ public class ExerciseQuestionGroupService {
         ExerciseQuestionGroup group = ExerciseQuestionGroup.builder()
                 .orderIndex(request.getOrderIndex())
                 .audioUrl(request.getAudioUrl())
+                .audioStartMs(request.getAudioStartMs())
+                .audioEndMs(request.getAudioEndMs())
+                .timelineLabel(request.getTimelineLabel())
                 .imageUrl(request.getImageUrl())
                 .passage(request.getPassage())
                 .sourceTopicId(request.getSourceTopicId())
@@ -82,6 +85,9 @@ public class ExerciseQuestionGroupService {
 
         if (request.getOrderIndex() != null) group.setOrderIndex(request.getOrderIndex());
         if (request.getAudioUrl() != null) group.setAudioUrl(request.getAudioUrl());
+        if (request.getAudioStartMs() != null) group.setAudioStartMs(request.getAudioStartMs());
+        if (request.getAudioEndMs() != null) group.setAudioEndMs(request.getAudioEndMs());
+        if (request.getTimelineLabel() != null) group.setTimelineLabel(request.getTimelineLabel());
         if (request.getImageUrl() != null) group.setImageUrl(request.getImageUrl());
         if (request.getPassage() != null) group.setPassage(request.getPassage());
         if (request.getSourceTopicId() != null) group.setSourceTopicId(request.getSourceTopicId());
@@ -146,6 +152,9 @@ public class ExerciseQuestionGroupService {
                 .id(group.getId())
                 .orderIndex(group.getOrderIndex())
                 .audioUrl(group.getAudioUrl())
+                .audioStartMs(group.getAudioStartMs())
+                .audioEndMs(group.getAudioEndMs())
+                .timelineLabel(group.getTimelineLabel())
                 .imageUrl(group.getImageUrl())
                 .passage(group.getPassage())
                 .sourceTopicId(group.getSourceTopicId())

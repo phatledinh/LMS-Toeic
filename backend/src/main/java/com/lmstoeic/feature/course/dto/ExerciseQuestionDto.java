@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 public class ExerciseQuestionDto {
     private Long id;
     private Integer questionNumber;
+    private Integer audioStartMs;
+    private Integer audioEndMs;
     private String content;
     private String optionA;
     private String optionB;

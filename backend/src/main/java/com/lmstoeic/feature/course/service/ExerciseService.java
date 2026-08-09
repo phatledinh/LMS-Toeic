@@ -52,6 +52,12 @@ public class ExerciseService {
                 .exerciseType(request.getExerciseType())
                 .orderIndex(request.getOrderIndex() != null ? request.getOrderIndex() : 0)
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .fullAudioUrl(request.getFullAudioUrl())
+                .audioDurationMs(request.getAudioDurationMs())
+                .audioVersion(request.getAudioVersion())
+                .readingImageMode(request.getReadingImageMode())
+                .readingImageUrl(request.getReadingImageUrl())
+                .readingImageUrls(request.getReadingImageUrls())
                 .topic(topic)
                 .build();
 
@@ -66,6 +72,12 @@ public class ExerciseService {
         if (request.getExerciseType() != null) exercise.setExerciseType(request.getExerciseType());
         if (request.getOrderIndex() != null) exercise.setOrderIndex(request.getOrderIndex());
         if (request.getIsActive() != null) exercise.setIsActive(request.getIsActive());
+        if (request.getFullAudioUrl() != null) exercise.setFullAudioUrl(request.getFullAudioUrl());
+        if (request.getAudioDurationMs() != null) exercise.setAudioDurationMs(request.getAudioDurationMs());
+        if (request.getAudioVersion() != null) exercise.setAudioVersion(request.getAudioVersion());
+        if (request.getReadingImageMode() != null) exercise.setReadingImageMode(request.getReadingImageMode());
+        if (request.getReadingImageUrl() != null) exercise.setReadingImageUrl(request.getReadingImageUrl());
+        if (request.getReadingImageUrls() != null) exercise.setReadingImageUrls(request.getReadingImageUrls());
 
         return mapToExerciseDto(exerciseRepository.save(exercise));
     }
@@ -83,6 +95,12 @@ public class ExerciseService {
                 .id(exercise.getId())
                 .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
                 .orderIndex(exercise.getOrderIndex())
+                .fullAudioUrl(exercise.getFullAudioUrl())
+                .audioDurationMs(exercise.getAudioDurationMs())
+                .audioVersion(exercise.getAudioVersion())
+                .readingImageMode(exercise.getReadingImageMode())
+                .readingImageUrl(exercise.getReadingImageUrl())
+                .readingImageUrls(exercise.getReadingImageUrls())
                 .questions(exercise.getQuestions() != null ? exercise.getQuestions().stream().map(this::mapToQuestionDto).collect(Collectors.toList()) : null)
                 .questionGroups(exercise.getQuestionGroups() != null ? exercise.getQuestionGroups().stream().map(this::mapToQuestionGroupDto).collect(Collectors.toList()) : null)
                 .build();
@@ -92,6 +110,8 @@ public class ExerciseService {
         return ExerciseQuestionDto.builder()
                 .id(question.getId())
                 .questionNumber(question.getQuestionNumber())
+                .audioStartMs(question.getAudioStartMs())
+                .audioEndMs(question.getAudioEndMs())
                 .content(question.getContent())
                 .optionA(question.getOptionA())
                 .optionB(question.getOptionB())
@@ -110,6 +130,9 @@ public class ExerciseService {
                 .id(group.getId())
                 .orderIndex(group.getOrderIndex())
                 .audioUrl(group.getAudioUrl())
+                .audioStartMs(group.getAudioStartMs())
+                .audioEndMs(group.getAudioEndMs())
+                .timelineLabel(group.getTimelineLabel())
                 .imageUrl(group.getImageUrl())
                 .passage(group.getPassage())
                 .exerciseId(group.getExercise() != null ? group.getExercise().getId() : null)

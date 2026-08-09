@@ -13,7 +13,9 @@ import lombok.NoArgsConstructor;
 public class QuestionRequest {
 
     private Integer questionNumber;
-    
+    private Integer audioStartMs;
+    private Integer audioEndMs;
+
     private String content;
     
     @NotBlank(message = "Option A is required")
