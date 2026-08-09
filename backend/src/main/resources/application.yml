@@ -31,3 +31,6 @@ jwt:
     access-token-expiration: 86400000000
     #7d
     refresh-expiration: 604800000
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:103904649059-ukvh1nq2frat6nd61gjv3k0o3vlk2joj.apps.googleusercontent.com}

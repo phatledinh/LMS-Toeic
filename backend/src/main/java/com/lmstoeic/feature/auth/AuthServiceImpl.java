@@ -9,20 +9,27 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.lmstoeic.common.exception.DuplicateResourceException;
 import com.lmstoeic.common.exception.InvalidTokenException;
 import com.lmstoeic.common.exception.ResourceNotFoundException;
+import com.lmstoeic.feature.auth.dto.GoogleLoginRequest;
 import com.lmstoeic.feature.auth.dto.LoginRequest;
 import com.lmstoeic.feature.auth.dto.LoginResponse;
 import com.lmstoeic.feature.auth.dto.RegisterRequest;
 import com.lmstoeic.feature.auth.dto.RegisterResponse;
+import com.lmstoeic.feature.role.entity.Role;
+import com.lmstoeic.feature.role.repository.RoleRepository;
 import com.lmstoeic.feature.user.entity.User;
 import com.lmstoeic.feature.user.repository.UserRepository;
 import com.lmstoeic.feature.user.dto.UserResponse;
@@ -42,8 +49,10 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtDecoder googleJwtDecoder;
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
@@ -51,16 +60,22 @@ public class AuthServiceImpl implements AuthService {
     @Value("${jwt.refresh-expiration}")
     private long refreshTokenExpiration;
 
+    @Value("${google.client-id:}")
+    private String googleClientId;
+
     public AuthServiceImpl(AuthenticationManager authenticationManager,
             JwtEncoder jwtEncoder,
             UserRepository userRepository,
+            RoleRepository roleRepository,
             RefreshTokenRepository refreshTokenRepository,
             PasswordEncoder passwordEncoder) {
         this.authenticationManager = authenticationManager;
         this.jwtEncoder = jwtEncoder;
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.googleJwtDecoder = NimbusJwtDecoder.withIssuerLocation("https://accounts.google.com").build();
     }
 
     @Override
@@ -81,6 +96,48 @@ public class AuthServiceImpl implements AuthService {
                       ? user.getRoles().get(0).getName() 
                       : "USER";
         log.info("Người dùng đăng nhập thành công: {}", user.getEmail());
+        return new LoginResponse(rawAccessToken, rawRefreshToken, user.getFullName(), role);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponse loginWithGoogle(GoogleLoginRequest request, String deviceInfo, String ipAddress) {
+        if (googleClientId == null || googleClientId.isBlank()) {
+            throw new InvalidTokenException("Google client id is not configured");
+        }
+
+        Jwt googleJwt = decodeGoogleCredential(request.credential());
+        if (!googleJwt.getAudience().contains(googleClientId)) {
+            throw new InvalidTokenException("Google credential audience is invalid");
+        }
+
+        Boolean emailVerified = googleJwt.getClaim("email_verified");
+        if (!Boolean.TRUE.equals(emailVerified)) {
+            throw new InvalidTokenException("Google email is not verified");
+        }
+
+        String email = googleJwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            throw new InvalidTokenException("Google credential does not contain an email");
+        }
+
+        String fullName = googleJwt.getClaimAsString("name");
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> createGoogleUser(email, fullName));
+
+        List<String> roles = user.getRoles() == null ? List.of() : user.getRoles().stream()
+                .map(roleItem -> "ROLE_" + roleItem.getName())
+                .toList();
+
+        String rawAccessToken = generateAccessTokenFromUser(user.getId(), user.getEmail(), roles);
+        String rawRefreshToken = generateRefreshToken(user.getId(), user.getEmail());
+
+        saveRefreshToken(rawRefreshToken, user, deviceInfo, ipAddress);
+
+        String role = (user.getRoles() != null && !user.getRoles().isEmpty())
+                ? user.getRoles().get(0).getName()
+                : "USER";
+        log.info("Google login successful for user: {}", user.getEmail());
         return new LoginResponse(rawAccessToken, rawRefreshToken, user.getFullName(), role);
     }
 
@@ -206,6 +263,30 @@ public class AuthServiceImpl implements AuthService {
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+    }
+
+    private Jwt decodeGoogleCredential(String credential) {
+        try {
+            return googleJwtDecoder.decode(credential);
+        } catch (JwtException e) {
+            throw new InvalidTokenException("Google credential is invalid");
+        }
+    }
+
+    private User createGoogleUser(String email, String fullName) {
+        User user = new User();
+        user.setEmail(email);
+        user.setFullName((fullName == null || fullName.isBlank()) ? email : fullName);
+        user.setPassword(passwordEncoder.encode("GOOGLE_LOGIN_ONLY:" + java.util.UUID.randomUUID()));
+        user.setTargetScore(500);
+        user.setIsActive(true);
+
+        Role userRole = roleRepository.findByName("USER").orElse(null);
+        if (userRole != null) {
+            user.setRoles(List.of(userRole));
+        }
+
+        return userRepository.save(user);
     }
 
     private void saveRefreshToken(String rawToken, User user, String deviceInfo, String ipAddress) {
