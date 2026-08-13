@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   getSections,
   adminCreateSection,
+  adminUpdateSection,
+  adminDeleteSection,
   adminCreateTopic,
+  adminUpdateTopic,
+  adminDeleteTopic,
   adminCreateExercise,
   adminUpdateExercise,
   adminDeleteExercise,
@@ -11,18 +15,17 @@ import {
 import DataTable from '../../components/admin/DataTable';
 import Modal from '../../components/admin/Modal';
 
-const EXERCISE_TYPES = [
-  'READING_PART5',
-  'READING_PART6',
-  'READING_PART7',
-  'LISTENING_PART1',
-  'LISTENING_PART2',
-  'LISTENING_PART3',
-  'LISTENING_PART4',
-  'GRAMMAR',
+const PARTS = [
+  { label: 'Part 1 - Listening hình ảnh', type: 'LISTENING_PART1', standardQuestions: 6 },
+  { label: 'Part 2 - Listening hỏi đáp', type: 'LISTENING_PART2', standardQuestions: 25 },
+  { label: 'Part 3 - Conversations', type: 'LISTENING_PART3', standardQuestions: 39 },
+  { label: 'Part 4 - Talks', type: 'LISTENING_PART4', standardQuestions: 30 },
+  { label: 'Part 5 - Reading grammar', type: 'READING_PART5', standardQuestions: 30 },
+  { label: 'Part 6 - Text completion', type: 'READING_PART6', standardQuestions: 16 },
+  { label: 'Part 7 - Reading comprehension', type: 'READING_PART7', standardQuestions: 54 },
 ];
 
-const ONLINE_SECTION_SLUG = 'de-thi-online-toeic-demo';
+const ONLINE_TEST_MARKER = '[ONLINE_TEST]';
 
 const slugify = (value) => value
   .toLowerCase()
@@ -33,8 +36,8 @@ const slugify = (value) => value
   .replace(/^-+|-+$/g, '');
 
 const isOnlineSection = (section) => {
-  const text = `${section.slug || ''} ${section.title || ''}`.toLowerCase();
-  return text.includes('online') || text.includes('de-thi') || text.includes('đề thi');
+  const text = `${section.slug || ''} ${section.title || ''} ${section.description || ''}`.toLowerCase();
+  return text.includes('online') || text.includes('de-thi') || text.includes('đề thi') || text.includes(ONLINE_TEST_MARKER.toLowerCase());
 };
 
 const fieldStyle = {
@@ -51,27 +54,42 @@ const labelStyle = {
   color: '#2c3e50',
 };
 
+const cardStyle = {
+  background: '#fff',
+  padding: 16,
+  borderRadius: 8,
+  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+};
+
+const buildOnlineDescription = (description) => {
+  const cleanDescription = String(description || '').replace(ONLINE_TEST_MARKER, '').trim();
+  return cleanDescription ? `${ONLINE_TEST_MARKER} ${cleanDescription}` : ONLINE_TEST_MARKER;
+};
+
+const getPartLabel = (exerciseType) => PARTS.find((part) => part.type === exerciseType)?.label || exerciseType;
+
 const AdminOnlineTestManagePage = () => {
   const navigate = useNavigate();
   const [sections, setSections] = useState([]);
   const [selectedSectionId, setSelectedSectionId] = useState('');
-  const [selectedTopicId, setSelectedTopicId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingExercise, setEditingExercise] = useState(null);
-  const [createForm, setCreateForm] = useState({
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [partModalOpen, setPartModalOpen] = useState(false);
+  const [editingTest, setEditingTest] = useState(null);
+  const [editingPart, setEditingPart] = useState(null);
+  const [testForm, setTestForm] = useState({
     title: '',
     slug: '',
     description: '',
-    exerciseType: 'READING_PART5',
-    totalQuestions: 0,
     orderIndex: 1,
   });
-  const [exerciseForm, setExerciseForm] = useState({
-    exerciseType: 'READING_PART5',
-    totalQuestions: 0,
+  const [partForm, setPartForm] = useState({
+    title: '',
+    slug: '',
+    description: '',
+    exerciseType: 'LISTENING_PART1',
+    totalQuestions: 6,
     orderIndex: 1,
-    topicId: '',
   });
 
   const fetchSections = async () => {
@@ -80,9 +98,11 @@ const AdminOnlineTestManagePage = () => {
       const res = await getSections();
       const data = res.data || [];
       setSections(data);
+
       const onlineSections = data.filter(isOnlineSection);
-      const firstOnline = onlineSections[0];
-      if (!selectedSectionId && firstOnline) setSelectedSectionId(String(firstOnline.id));
+      if (!selectedSectionId && onlineSections[0]) {
+        setSelectedSectionId(String(onlineSections[0].id));
+      }
     } catch (err) {
       alert(err.message || 'Không tải được dữ liệu đề thi online');
     } finally {
@@ -101,244 +121,352 @@ const AdminOnlineTestManagePage = () => {
     [onlineSections, selectedSectionId],
   );
 
-  const topics = selectedSection?.topics || [];
+  const partRows = useMemo(() => {
+    if (!selectedSection) return [];
 
-  const rows = useMemo(() => {
-    return onlineSections.flatMap((section) => (section.topics || []).flatMap((topic) => (
+    return (selectedSection.topics || []).flatMap((topic) => (
       topic.exercises || []
     ).map((exercise) => ({
       ...exercise,
-      sectionId: section.id,
-      sectionTitle: section.title,
       topicId: topic.id,
       topicTitle: topic.title,
       topicSlug: topic.slug,
-    }))));
-  }, [onlineSections]);
+      topicDescription: topic.description || '',
+      sectionId: selectedSection.id,
+      sectionTitle: selectedSection.title,
+      sectionSlug: selectedSection.slug,
+      partLabel: getPartLabel(exercise.exerciseType),
+    }))).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+  }, [selectedSection]);
 
-  const filteredRows = rows.filter((row) => {
-    if (selectedSectionId && String(row.sectionId) !== String(selectedSectionId)) return false;
-    if (selectedTopicId && String(row.topicId) !== String(selectedTopicId)) return false;
-    return true;
-  });
-
-  const openCreateModal = () => {
-    setCreateForm({
+  const openCreateTest = () => {
+    setEditingTest(null);
+    setTestForm({
       title: '',
       slug: '',
       description: '',
-      exerciseType: 'READING_PART5',
-      totalQuestions: 0,
-      orderIndex: filteredRows.length + 1,
+      orderIndex: onlineSections.length + 1,
     });
-    setIsCreateModalOpen(true);
+    setTestModalOpen(true);
   };
 
-  const handleCreateChange = (e) => {
+  const openEditTest = (section) => {
+    setEditingTest(section);
+    setTestForm({
+      title: section.title || '',
+      slug: section.slug || '',
+      description: String(section.description || '').replace(ONLINE_TEST_MARKER, '').trim(),
+      orderIndex: section.orderIndex || 1,
+    });
+    setTestModalOpen(true);
+  };
+
+  const handleTestChange = (e) => {
     const { name, value } = e.target;
-    setCreateForm((prev) => ({
+    setTestForm((prev) => ({
       ...prev,
       [name]: value,
       ...(name === 'title' && !prev.slug ? { slug: slugify(value) } : {}),
     }));
   };
 
-  const handleExerciseChange = (e) => {
-    const { name, value } = e.target;
-    setExerciseForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const ensureOnlineSection = async () => {
-    if (selectedSectionId) return Number(selectedSectionId);
-    const existing = onlineSections[0];
-    if (existing) return existing.id;
-
-    const res = await adminCreateSection({
-      title: 'De thi online TOEIC Demo',
-      slug: ONLINE_SECTION_SLUG,
-      description: 'Danh sách đề thi online TOEIC dùng cho phòng thi.',
-      orderIndex: 90,
-    });
-    return res.data.id;
-  };
-
-  const createOnlineTest = async (e) => {
+  const saveTest = async (e) => {
     e.preventDefault();
-    try {
-      const sectionId = await ensureOnlineSection();
-      const topicRes = await adminCreateTopic(sectionId, {
-        title: createForm.title,
-        slug: createForm.slug || slugify(createForm.title),
-        description: createForm.description,
-        orderIndex: Number(createForm.orderIndex) || 1,
-      });
-      const exerciseRes = await adminCreateExercise(topicRes.data.id, {
-        exerciseType: createForm.exerciseType,
-        totalQuestions: Number(createForm.totalQuestions) || 0,
-        orderIndex: 1,
-      });
+    const payload = {
+      title: testForm.title.trim(),
+      slug: testForm.slug.trim() || slugify(testForm.title),
+      description: buildOnlineDescription(testForm.description),
+      orderIndex: Number(testForm.orderIndex) || 1,
+      isActive: true,
+    };
 
-      setIsCreateModalOpen(false);
+    try {
+      const res = editingTest
+        ? await adminUpdateSection(editingTest.id, payload)
+        : await adminCreateSection(payload);
+      setTestModalOpen(false);
       await fetchSections();
-      navigate(`/admin/exercises/${exerciseRes.data.id}/questions`);
+      setSelectedSectionId(String(editingTest?.id || res.data.id));
     } catch (err) {
-      alert(err.message || 'Không tạo được đề thi online');
+      alert(err.message || 'Không lưu được bộ đề online');
     }
   };
 
-  const openEditExercise = (exercise) => {
-    setEditingExercise(exercise);
-    setExerciseForm({
-      exerciseType: exercise.exerciseType || 'READING_PART5',
-      totalQuestions: exercise.totalQuestions || 0,
-      orderIndex: exercise.orderIndex || 1,
-      topicId: exercise.topicId,
+  const deleteTest = async (section) => {
+    if (!window.confirm(`Xóa toàn bộ đề "${section.title}" và các part bên trong?`)) return;
+
+    try {
+      await adminDeleteSection(section.id);
+      setSelectedSectionId('');
+      await fetchSections();
+    } catch (err) {
+      alert(err.message || 'Không xóa được bộ đề online');
+    }
+  };
+
+  const openCreatePart = () => {
+    if (!selectedSection) return;
+
+    const nextPart = PARTS.find((part) => !partRows.some((row) => row.exerciseType === part.type)) || PARTS[0];
+    const title = nextPart.label.split(' - ')[0];
+
+    setEditingPart(null);
+    setPartForm({
+      title,
+      slug: slugify(title),
+      description: '',
+      exerciseType: nextPart.type,
+      totalQuestions: nextPart.standardQuestions,
+      orderIndex: partRows.length + 1,
+    });
+    setPartModalOpen(true);
+  };
+
+  const openEditPart = (part) => {
+    setEditingPart(part);
+    setPartForm({
+      title: part.topicTitle || '',
+      slug: part.topicSlug || '',
+      description: part.topicDescription || '',
+      exerciseType: part.exerciseType || 'LISTENING_PART1',
+      totalQuestions: part.totalQuestions || 0,
+      orderIndex: part.orderIndex || 1,
+    });
+    setPartModalOpen(true);
+  };
+
+  const handlePartChange = (e) => {
+    const { name, value } = e.target;
+    setPartForm((prev) => {
+      const next = {
+        ...prev,
+        [name]: value,
+        ...(name === 'title' && !prev.slug ? { slug: slugify(value) } : {}),
+      };
+
+      if (name === 'exerciseType') {
+        const partConfig = PARTS.find((part) => part.type === value);
+        if (partConfig && (!prev.totalQuestions || Number(prev.totalQuestions) === 0)) {
+          next.totalQuestions = partConfig.standardQuestions;
+        }
+      }
+
+      return next;
     });
   };
 
-  const saveExercise = async (e) => {
+  const savePart = async (e) => {
     e.preventDefault();
+    if (!selectedSection) return;
+
     try {
-      await adminUpdateExercise(editingExercise.id, {
-        exerciseType: exerciseForm.exerciseType,
-        totalQuestions: Number(exerciseForm.totalQuestions) || 0,
-        orderIndex: Number(exerciseForm.orderIndex) || 1,
-        topicId: Number(exerciseForm.topicId),
-      });
-      setEditingExercise(null);
-      fetchSections();
+      if (editingPart) {
+        await adminUpdateTopic(editingPart.topicId, {
+          title: partForm.title.trim(),
+          slug: partForm.slug.trim() || slugify(partForm.title),
+          description: partForm.description,
+          orderIndex: Number(partForm.orderIndex) || 1,
+          isActive: true,
+          sectionId: Number(selectedSection.id),
+        });
+        await adminUpdateExercise(editingPart.id, {
+          exerciseType: partForm.exerciseType,
+          totalQuestions: Number(partForm.totalQuestions) || 0,
+          orderIndex: Number(partForm.orderIndex) || 1,
+          topicId: Number(editingPart.topicId),
+          isActive: true,
+        });
+      } else {
+        const topicRes = await adminCreateTopic(selectedSection.id, {
+          title: partForm.title.trim(),
+          slug: partForm.slug.trim() || slugify(partForm.title),
+          description: partForm.description,
+          orderIndex: Number(partForm.orderIndex) || 1,
+          isActive: true,
+        });
+        await adminCreateExercise(topicRes.data.id, {
+          exerciseType: partForm.exerciseType,
+          totalQuestions: Number(partForm.totalQuestions) || 0,
+          orderIndex: Number(partForm.orderIndex) || 1,
+          isActive: true,
+        });
+      }
+
+      setPartModalOpen(false);
+      await fetchSections();
     } catch (err) {
-      alert(err.message || 'Không lưu được đề thi');
+      alert(err.message || 'Không lưu được part của đề thi');
     }
   };
 
-  const deleteExercise = async (exercise) => {
-    if (!window.confirm(`Xóa đề "${exercise.topicTitle}"?`)) return;
+  const deletePart = async (part) => {
+    if (!window.confirm(`Xóa ${part.topicTitle}?`)) return;
+
     try {
-      await adminDeleteExercise(exercise.id);
-      fetchSections();
+      await adminDeleteExercise(part.id);
+      await adminDeleteTopic(part.topicId);
+      await fetchSections();
     } catch (err) {
-      alert(err.message || 'Không xóa được đề thi');
+      alert(err.message || 'Không xóa được part');
     }
   };
+
+  const questionCount = partRows.reduce((sum, row) => sum + (Number(row.totalQuestions) || 0), 0);
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
         <div>
           <h1 style={{ margin: 0 }}>Quản lý đề thi online</h1>
           <p style={{ margin: '8px 0 0', color: '#6b7280' }}>
-            Quản lý các đề xuất hiện ở trang học viên mục "Đề thi online".
+            Tạo bộ đề TOEIC online, chia thành từng part và nhập câu hỏi cho từng part.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openCreateModal} style={{ padding: '10px 16px' }}>
-          + Thêm đề online
+        <button className="btn btn-primary" onClick={openCreateTest} style={{ padding: '10px 16px' }}>
+          + Thêm bộ đề
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 18, background: '#fff', padding: 16, borderRadius: 8 }}>
-        <select value={selectedSectionId} onChange={(e) => { setSelectedSectionId(e.target.value); setSelectedTopicId(''); }} style={{ ...fieldStyle, maxWidth: 280 }}>
-          <option value="">Tất cả section đề thi</option>
-          {onlineSections.map((section) => (
-            <option key={section.id} value={section.id}>{section.title}</option>
-          ))}
-        </select>
-        <select value={selectedTopicId} onChange={(e) => setSelectedTopicId(e.target.value)} style={{ ...fieldStyle, maxWidth: 280 }} disabled={!selectedSection}>
-          <option value="">Tất cả topic</option>
-          {topics.map((topic) => (
-            <option key={topic.id} value={topic.id}>{topic.title}</option>
-          ))}
-        </select>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 0.9fr) minmax(480px, 1.5fr)', gap: 18 }}>
+        <section style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Bộ đề online</h2>
+            <span style={{ color: '#6b7280', fontWeight: 700 }}>{onlineSections.length} đề</span>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 24, color: '#6b7280' }}>Đang tải dữ liệu...</div>
+          ) : (
+            <DataTable
+              columns={[
+                {
+                  header: 'Tên đề',
+                  render: (row) => (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSectionId(String(row.id))}
+                      style={{
+                        background: 'transparent',
+                        border: 0,
+                        padding: 0,
+                        color: String(selectedSectionId) === String(row.id) ? '#1a73e8' : '#2c3e50',
+                        cursor: 'pointer',
+                        fontWeight: String(selectedSectionId) === String(row.id) ? 800 : 600,
+                        textAlign: 'left',
+                      }}
+                    >
+                      {row.title}
+                    </button>
+                  ),
+                },
+                { header: 'Slug', accessor: 'slug' },
+                { header: 'Thứ tự', accessor: 'orderIndex' },
+              ]}
+              data={onlineSections}
+              onEdit={openEditTest}
+              onDelete={deleteTest}
+            />
+          )}
+        </section>
+
+        <section style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.15rem' }}>
+                {selectedSection ? selectedSection.title : 'Chọn một bộ đề'}
+              </h2>
+              <p style={{ margin: '6px 0 0', color: '#6b7280' }}>
+                {selectedSection
+                  ? `${partRows.length} part, ${questionCount} câu hỏi`
+                  : 'Chọn bộ đề bên trái để quản lý các part.'}
+              </p>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={openCreatePart}
+              disabled={!selectedSection}
+              style={{ padding: '8px 12px', opacity: selectedSection ? 1 : 0.55 }}
+            >
+              + Thêm part
+            </button>
+          </div>
+
+          <DataTable
+            columns={[
+              { header: 'Part', accessor: 'topicTitle' },
+              { header: 'Loại', render: (row) => row.partLabel },
+              { header: 'Số câu', accessor: 'totalQuestions' },
+              { header: 'Thứ tự', accessor: 'orderIndex' },
+            ]}
+            data={partRows}
+            onEdit={openEditPart}
+            onDelete={deletePart}
+            customActions={[
+              { label: 'Câu hỏi', color: '#f39c12', onClick: (row) => navigate(`/admin/exercises/${row.id}/questions`) },
+              { label: 'Xem thử', color: '#2ecc71', onClick: (row) => window.open(`http://localhost:5173/exercises/${row.id}`, '_blank') },
+            ]}
+          />
+        </section>
       </div>
 
-      {loading ? (
-        <div style={{ padding: 30, background: '#fff', borderRadius: 8 }}>Đang tải dữ liệu...</div>
-      ) : (
-        <DataTable
-          columns={[
-            { header: 'ID', accessor: 'id' },
-            { header: 'Tên đề', accessor: 'topicTitle' },
-            { header: 'Section', accessor: 'sectionTitle' },
-            { header: 'Loại', accessor: 'exerciseType' },
-            { header: 'Số câu', accessor: 'totalQuestions' },
-            { header: 'Thứ tự', accessor: 'orderIndex' },
-          ]}
-          data={filteredRows}
-          onEdit={openEditExercise}
-          onDelete={deleteExercise}
-          customActions={[
-            { label: 'Câu hỏi', color: '#f39c12', onClick: (row) => navigate(`/admin/exercises/${row.id}/questions`) },
-            { label: 'Xem thử', color: '#2ecc71', onClick: (row) => window.open(`http://localhost:5173/exercises/${row.id}`, '_blank') },
-          ]}
-        />
-      )}
-
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Thêm đề thi online">
-        <form onSubmit={createOnlineTest}>
+      <Modal isOpen={testModalOpen} onClose={() => setTestModalOpen(false)} title={editingTest ? 'Sửa bộ đề online' : 'Thêm bộ đề online'}>
+        <form onSubmit={saveTest}>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Tên đề (*)</label>
-            <input name="title" value={createForm.title} onChange={handleCreateChange} required style={fieldStyle} placeholder="VD: Mini Test 2 - Part 5" />
+            <label style={labelStyle}>Tên bộ đề (*)</label>
+            <input name="title" value={testForm.title} onChange={handleTestChange} required style={fieldStyle} placeholder="VD: TOEIC Test 3 - 2026" />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Slug (*)</label>
-            <input name="slug" value={createForm.slug} onChange={handleCreateChange} required style={fieldStyle} placeholder="mini-test-2-part-5" />
+            <input name="slug" value={testForm.slug} onChange={handleTestChange} required style={fieldStyle} placeholder="toeic-test-3-2026" />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Mô tả</label>
-            <textarea name="description" value={createForm.description} onChange={handleCreateChange} style={fieldStyle} rows={3} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-            <div>
-              <label style={labelStyle}>Loại đề</label>
-              <select name="exerciseType" value={createForm.exerciseType} onChange={handleCreateChange} style={fieldStyle}>
-                {EXERCISE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Số câu dự kiến</label>
-              <input type="number" name="totalQuestions" value={createForm.totalQuestions} onChange={handleCreateChange} style={fieldStyle} min="0" />
-            </div>
+            <textarea name="description" value={testForm.description} onChange={handleTestChange} style={fieldStyle} rows={3} />
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Thứ tự hiển thị</label>
-            <input type="number" name="orderIndex" value={createForm.orderIndex} onChange={handleCreateChange} style={fieldStyle} min="1" />
+            <input type="number" name="orderIndex" value={testForm.orderIndex} onChange={handleTestChange} style={fieldStyle} min="1" />
           </div>
           <div style={{ textAlign: 'right' }}>
-            <button type="button" className="btn" onClick={() => setIsCreateModalOpen(false)} style={{ marginRight: 10, padding: '8px 16px' }}>Hủy</button>
-            <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>Tạo và nhập câu hỏi</button>
+            <button type="button" className="btn" onClick={() => setTestModalOpen(false)} style={{ marginRight: 10, padding: '8px 16px' }}>Hủy</button>
+            <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>Lưu</button>
           </div>
         </form>
       </Modal>
 
-      <Modal isOpen={Boolean(editingExercise)} onClose={() => setEditingExercise(null)} title="Sửa cấu hình đề">
-        <form onSubmit={saveExercise}>
+      <Modal isOpen={partModalOpen} onClose={() => setPartModalOpen(false)} title={editingPart ? 'Sửa part trong đề' : 'Thêm part vào đề'}>
+        <form onSubmit={savePart}>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Topic</label>
-            <select name="topicId" value={exerciseForm.topicId} onChange={handleExerciseChange} style={fieldStyle}>
-              {onlineSections.flatMap((section) => section.topics || []).map((topic) => (
-                <option key={topic.id} value={topic.id}>{topic.title}</option>
-              ))}
-            </select>
+            <label style={labelStyle}>Tên part (*)</label>
+            <input name="title" value={partForm.title} onChange={handlePartChange} required style={fieldStyle} placeholder="VD: Part 5" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Slug (*)</label>
+            <input name="slug" value={partForm.slug} onChange={handlePartChange} required style={fieldStyle} placeholder="part-5" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Mô tả</label>
+            <textarea name="description" value={partForm.description} onChange={handlePartChange} style={fieldStyle} rows={3} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
-              <label style={labelStyle}>Loại đề</label>
-              <select name="exerciseType" value={exerciseForm.exerciseType} onChange={handleExerciseChange} style={fieldStyle}>
-                {EXERCISE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              <label style={labelStyle}>Loại part</label>
+              <select name="exerciseType" value={partForm.exerciseType} onChange={handlePartChange} style={fieldStyle}>
+                {PARTS.map((part) => <option key={part.type} value={part.type}>{part.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Số câu</label>
-              <input type="number" name="totalQuestions" value={exerciseForm.totalQuestions} onChange={handleExerciseChange} style={fieldStyle} min="0" />
+              <label style={labelStyle}>Số câu dự kiến</label>
+              <input type="number" name="totalQuestions" value={partForm.totalQuestions} onChange={handlePartChange} style={fieldStyle} min="0" />
             </div>
           </div>
           <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Thứ tự</label>
-            <input type="number" name="orderIndex" value={exerciseForm.orderIndex} onChange={handleExerciseChange} style={fieldStyle} min="1" />
+            <label style={labelStyle}>Thứ tự hiển thị</label>
+            <input type="number" name="orderIndex" value={partForm.orderIndex} onChange={handlePartChange} style={fieldStyle} min="1" />
           </div>
           <div style={{ textAlign: 'right' }}>
-            <button type="button" className="btn" onClick={() => setEditingExercise(null)} style={{ marginRight: 10, padding: '8px 16px' }}>Hủy</button>
-            <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>Lưu</button>
+            <button type="button" className="btn" onClick={() => setPartModalOpen(false)} style={{ marginRight: 10, padding: '8px 16px' }}>Hủy</button>
+            <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>Lưu part</button>
           </div>
         </form>
       </Modal>
