@@ -12,7 +12,20 @@ const PART_CONFIG = [
   { part: 7, type: 'READING_PART7' },
 ];
 
-const ENABLED_ONLINE_TEST_SLUGS = ['test-2-2026'];
+const ONLINE_TEST_MARKER = '[ONLINE_TEST]';
+
+const isOnlineTestSection = (section) => {
+  const text = `${section.slug || ''} ${section.title || ''} ${section.description || ''}`.toLowerCase();
+  const isVocabularyOrGrammar = text.includes('tu-vung') || text.includes('từ vựng') || text.includes('ngu-phap') || text.includes('ngữ pháp');
+
+  if (isVocabularyOrGrammar) return false;
+
+  return text.includes('online')
+    || text.includes('de-thi')
+    || text.includes('đề thi')
+    || text.includes('test-')
+    || text.includes(ONLINE_TEST_MARKER.toLowerCase());
+};
 
 const getTestTitle = (section) => {
   if (section.slug === 'test-2-2026') return 'TEST 2 - 2026';
@@ -45,8 +58,7 @@ const OnlineTestsPage = () => {
 
   const testGroups = useMemo(() => {
     return sections
-      .filter((section) => !section.slug?.includes('tu-vung') && !section.slug?.includes('ngu-phap'))
-      .filter((section) => ENABLED_ONLINE_TEST_SLUGS.includes(section.slug))
+      .filter(isOnlineTestSection)
       .map((section) => {
         const exercises = (section.topics || []).flatMap((topic) =>
           (topic.exercises || []).map((exercise) => ({
@@ -68,7 +80,7 @@ const OnlineTestsPage = () => {
           title: getTestTitle(section),
           originalTitle: section.title,
           slug: section.slug,
-          description: section.description,
+          description: String(section.description || '').replace(ONLINE_TEST_MARKER, '').trim(),
           exercises,
           availableParts,
           questionCount,
@@ -78,9 +90,7 @@ const OnlineTestsPage = () => {
       .sort((a, b) => {
         if (a.slug === 'test-2-2026') return -1;
         if (b.slug === 'test-2-2026') return 1;
-        if (a.slug === 'de-thi-online-toeic-demo') return -1;
-        if (b.slug === 'de-thi-online-toeic-demo') return 1;
-        return String(a.title).localeCompare(String(b.title));
+        return String(a.title).localeCompare(String(b.title), 'vi');
       });
   }, [sections]);
 

@@ -111,6 +111,24 @@ const htmlToPlainText = (value = '') => String(value)
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
+const questionContentStartsWithNumber = (question) => {
+  if (!question?.content || !question?.questionNumber) return false;
+  const plainContent = htmlToPlainText(question.content);
+  const escapedNumber = String(question.questionNumber).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escapedNumber}\\s*[.)]\\s*`).test(plainContent);
+};
+
+const TOEIC_SECTION_MAX_SCORE = 495;
+const TOEIC_SECTION_MIN_SCORE = 5;
+const TOEIC_SCORE_STEP = 5;
+
+const calculateSectionScore = (correctCount, totalCount) => {
+  if (totalCount <= 0) return 0;
+  const maxSteps = (TOEIC_SECTION_MAX_SCORE - TOEIC_SECTION_MIN_SCORE) / TOEIC_SCORE_STEP;
+  const earnedSteps = Math.round((correctCount / totalCount) * maxSteps);
+  return TOEIC_SECTION_MIN_SCORE + earnedSteps * TOEIC_SCORE_STEP;
+};
+
 export const AudioPlayer = ({ audioUrl, label, fallbackText, autoPlay = false, locked = false, onEnded }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -491,6 +509,7 @@ export const QuestionMCQ = ({
   const questionNumberText = questionNumberFormat === 'dot'
     ? `${question.questionNumber}.`
     : `Q${question.questionNumber}:`;
+  const contentIncludesQuestionNumber = questionContentStartsWithNumber(question);
 
   const getOptionClass = (opt) => {
     if (!showAnswer) {
@@ -507,12 +526,12 @@ export const QuestionMCQ = ({
         <>
           {inlineQuestionContent ? (
             <div className="question-number reading-inline-question">
-              <span>{questionNumberText}</span>
+              {!contentIncludesQuestionNumber && <span>{questionNumberText}</span>}
               <RichText html={question.content} className="question-content" />
             </div>
           ) : (
             <>
-              <div className="question-number">{questionNumberText}</div>
+              {!contentIncludesQuestionNumber && <div className="question-number">{questionNumberText}</div>}
               <RichText html={question.content} className="question-content" />
             </>
           )}
@@ -1541,12 +1560,8 @@ const QuizPage = () => {
 
     const listeningCorrect = listeningQuestions.filter((question) => answers[question.id] === question.correctAnswer).length;
     const readingCorrect = readingQuestions.filter((question) => answers[question.id] === question.correctAnswer).length;
-    const listeningScore = listeningQuestions.length > 0
-      ? Math.max(5, Math.round((listeningCorrect / listeningQuestions.length) * 100))
-      : 0;
-    const readingScore = readingQuestions.length > 0
-      ? Math.max(5, Math.round((readingCorrect / readingQuestions.length) * 100))
-      : 0;
+    const listeningScore = calculateSectionScore(listeningCorrect, listeningQuestions.length);
+    const readingScore = calculateSectionScore(readingCorrect, readingQuestions.length);
     const partBreakdown = Array.from({ length: 7 }, (_, index) => {
       const partNumber = index + 1;
       const partQuestions = allQuestions.filter((question) => {
@@ -1755,8 +1770,8 @@ const QuizPage = () => {
             <div className="toeic-result-body">
               <p>Bài kiểm tra của bạn đã được xử lý. Hãy chụp lại màn hình kết quả vì nó sẽ chỉ hiển thị 1 lần. Kết quả:</p>
               <p><strong>Số câu đúng: {submitResult.correctCount}/{submitResult.totalCount}</strong></p>
-              <p><strong>Listening: {submitResult.listeningCorrect}/{submitResult.listeningTotal || 100} - {submitResult.listeningScore} điểm</strong></p>
-              <p><strong>Reading: {submitResult.readingCorrect}/{submitResult.readingTotal || 100} - {submitResult.readingScore} điểm</strong></p>
+              <p><strong>Listening: {submitResult.listeningCorrect}/{submitResult.listeningTotal} - {submitResult.listeningScore} điểm</strong></p>
+              <p><strong>Reading: {submitResult.readingCorrect}/{submitResult.readingTotal} - {submitResult.readingScore} điểm</strong></p>
               <p><strong>Tổng điểm: {submitResult.totalToeicScore} điểm</strong></p>
               {showPartBreakdown && (
                 <div className="toeic-part-breakdown">
