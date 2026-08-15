@@ -5,7 +5,7 @@ services:
     container_name: video-db
     hostname: video-db
     environment:
-      POSTGRES_PASSWORD: root_password  # please change it
+      POSTGRES_PASSWORD: pa55ward  # please change it
       POSTGRES_DB: spring-video
     volumes:
       - ./postgresql/video-db:/var/lib/postgresql/data
@@ -19,12 +19,22 @@ services:
     container_name: worker-db
     hostname: worker-db
     environment:
-      POSTGRES_PASSWORD: root_password  # please change it
+      POSTGRES_PASSWORD: pa55ward  # please change it
       POSTGRES_DB: spring-worker
     volumes:
       - ./postgresql/worker-db:/var/lib/postgresql/data
     ports:
       - 5434:5432
+    networks:
+      - local
+
+  redis:
+    image: redis:7
+    container_name: redis
+    hostname: redis
+    restart: always
+    ports:
+      - 6379:6379
     networks:
       - local
 
@@ -38,7 +48,7 @@ services:
       - 9001:9001 # ui
     environment:
       MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: root_password  # please change it
+      MINIO_ROOT_PASSWORD: pa55ward  # please change it
     volumes:
       - ./minio/data:/data
     command: server --console-address ':9001' /data
@@ -133,6 +143,30 @@ services:
       KAFKA_CLUSTERS_0_METRICS_PORT: 9011
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://connect:8083
+    networks:
+      - local
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: worker
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://worker-db:5432/spring-worker
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: pa55ward
+      KAFKA_BOOTSTRAPSERVERS: "kafka1:29092,kafka2:29093"
+      MINIO_URL: "http://minio:9000"
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: pa55ward
+      MINIO_BUCKET_STORE: video
+      MINIO_BUCKET_STREAM: stream
+    depends_on:
+      - worker-db
+      - kafka1
+      - kafka2
+      - minio
     networks:
       - local
 

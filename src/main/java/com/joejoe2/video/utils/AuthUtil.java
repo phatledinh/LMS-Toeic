@@ -9,6 +9,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 public class AuthUtil {
+  public static final UserDetail ANONYMOUS_USER =
+      new UserDetail("00000000-0000-0000-0000-000000000000", "anonymous");
+
   public static boolean isAuthenticated() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     return authentication != null && !(authentication instanceof AnonymousAuthenticationToken);

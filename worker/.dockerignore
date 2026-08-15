@@ -1,0 +1,9 @@
+target
+tmp
+*.mp4
+.git
+.idea
+.jpb
+.mvn
+mvnw
+mvnw.cmd

@@ -1,13 +1,12 @@
 package com.joejoe2.video.controller.storage;
 
-import com.joejoe2.video.controller.constraint.auth.AuthenticatedApi;
 import com.joejoe2.video.data.UserDetail;
 import com.joejoe2.video.data.storage.UploadRequest;
 import com.joejoe2.video.service.storage.ObjectStorageService;
+import com.joejoe2.video.service.user.auth.UserDetailService;
 import com.joejoe2.video.utils.AuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import javax.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -21,9 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping(path = "/api/storage") // path prefix
 public class StorageController {
   @Autowired ObjectStorageService objectStorageService;
+  @Autowired UserDetailService userDetailService;
 
-  @AuthenticatedApi
-  @SecurityRequirement(name = "jwt")
+  // no auth required: anonymous callers share a fixed "anonymous" user/folder
   @Operation(description = "upload video file")
   @ApiResponses
   @RequestMapping(
@@ -31,10 +30,11 @@ public class StorageController {
       method = RequestMethod.POST,
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity upload(@Valid UploadRequest request) {
-    UserDetail user = AuthUtil.currentUserDetail();
+    UserDetail user = AuthUtil.isAuthenticated() ? AuthUtil.currentUserDetail() : AuthUtil.ANONYMOUS_USER;
     MultipartFile file = request.getFile();
     String objectName = "user/" + user.getId() + "/" + request.getFileName();
     try {
+      userDetailService.createUserIfAbsent(user);
       // upload
       objectStorageService.upload(file, objectName);
     } catch (Exception e) {

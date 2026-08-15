@@ -1,12 +1,12 @@
 package com.joejoe2.video.controller.video;
 
-import com.joejoe2.video.controller.constraint.auth.AuthenticatedApi;
 import com.joejoe2.video.data.UserDetail;
 import com.joejoe2.video.data.video.CreateRequest;
 import com.joejoe2.video.data.video.TsRequest;
 import com.joejoe2.video.data.video.VideoProfile;
 import com.joejoe2.video.data.video.VideoRequest;
 import com.joejoe2.video.exception.DoesNotExist;
+import com.joejoe2.video.service.user.auth.UserDetailService;
 import com.joejoe2.video.service.video.VideoService;
 import com.joejoe2.video.utils.AuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.UUID;
 import javax.validation.Valid;
 import org.springdoc.api.annotations.ParameterObject;
@@ -34,9 +33,9 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 @RequestMapping(path = "/api/video") // path prefix
 public class VideoController {
   @Autowired VideoService videoService;
+  @Autowired UserDetailService userDetailService;
 
-  @AuthenticatedApi
-  @SecurityRequirement(name = "jwt")
+  // no auth required: anonymous callers share a fixed "anonymous" user
   @Operation(description = "create video from file")
   @ApiResponses(
       value = {
@@ -50,7 +49,12 @@ public class VideoController {
       })
   @RequestMapping(path = "/", method = RequestMethod.POST)
   public ResponseEntity create(@Valid @RequestBody CreateRequest request) {
-    UserDetail user = AuthUtil.currentUserDetail();
+    UserDetail user = AuthUtil.isAuthenticated() ? AuthUtil.currentUserDetail() : AuthUtil.ANONYMOUS_USER;
+    try {
+      userDetailService.createUserIfAbsent(user);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     String objectName = "user/" + user.getId() + "/" + request.getFileName();
     VideoProfile profile =
         videoService.createFromObjectStorage(
