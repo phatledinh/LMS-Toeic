@@ -128,7 +128,7 @@ const AdminLessonPage = () => {
     if (!selectedTopic) return;
     try {
       if (editingItem) {
-        await adminUpdateLesson(editingItem.id, formData);
+        await adminUpdateLesson(editingItem.id, formData, selectedTopic);
         alert('Cập nhật bài học thành công!');
       } else {
         await adminCreateLesson(selectedTopic, formData);

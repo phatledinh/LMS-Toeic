@@ -17,7 +17,7 @@ const AdminCourseManagePage = () => {
   const [editingItem, setEditingItem] = useState(null);
 
   // Form states
-  const [formData, setFormData] = useState({ title: '', description: '', slug: '', orderIndex: 0 });
+  const [formData, setFormData] = useState({ title: '', description: '', slug: '', orderIndex: 0, isActive: true });
 
   useEffect(() => {
     fetchSections();
@@ -60,9 +60,9 @@ const AdminCourseManagePage = () => {
   const openSectionModal = (section = null) => {
     setEditingItem(section);
     if (section) {
-      setFormData({ title: section.title, description: section.description || '', slug: section.slug || '', orderIndex: section.orderIndex || 0 });
+      setFormData({ title: section.title, description: section.description || '', slug: section.slug || '', orderIndex: section.orderIndex || 0, isActive: section.isActive !== false });
     } else {
-      setFormData({ title: '', description: '', slug: '', orderIndex: 0 });
+      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true });
     }
     setIsSectionModalOpen(true);
   };
@@ -100,9 +100,9 @@ const AdminCourseManagePage = () => {
   const openTopicModal = (topic = null) => {
     setEditingItem(topic);
     if (topic) {
-      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0 });
+      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0, isActive: topic.isActive !== false });
     } else {
-      setFormData({ title: '', description: '', slug: '', orderIndex: 0 });
+      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true });
     }
     setIsTopicModalOpen(true);
   };
@@ -111,7 +111,7 @@ const AdminCourseManagePage = () => {
     e.preventDefault();
     try {
       if (editingItem) {
-        await adminUpdateTopic(editingItem.id, formData);
+        await adminUpdateTopic(editingItem.id, formData, selectedSection.id);
         alert('Cập nhật Topic thành công');
       } else {
         await adminCreateTopic(selectedSection.id, formData);

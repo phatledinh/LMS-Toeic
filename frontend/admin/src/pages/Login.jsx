@@ -14,11 +14,20 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      // Mock login always succeeds as ADMIN
-      login('mock-token-123', { email, fullName: 'Admin User', role: 'ADMIN' });
+      const response = await axios.post('http://localhost:8080/api/v1/auth/login', {
+        email,
+        password,
+      });
+
+      const { accessToken, fullName, role } = response.data.data;
+      if (role !== 'ADMIN') {
+        setError('Tài khoản này không có quyền quản trị.');
+        return;
+      }
+      login(accessToken, { email, fullName, role });
       navigate('/admin/courses');
     } catch (err) {
-      setError('Đăng nhập thất bại. Vui lòng thử lại!');
+      setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
     }
   };
 
