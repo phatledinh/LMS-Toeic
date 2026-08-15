@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getSections, getTopicsBySection, getLessonsByTopic, adminCreateLesson, adminUpdateLesson, adminDeleteLesson } from '../services/api';
+import { processVideoOnServer, isVideoServerUrl, getVideoServerUrl, setVideoServerUrl } from '../services/videoServerApi';
 import DataTable from '../components/admin/DataTable';
 import Modal from '../components/admin/Modal';
+import HlsVideoPlayer from '../components/common/HlsVideoPlayer';
+
+const VIDEO_STATUS_LABEL = {
+  uploading: 'Đang tải file lên storage...',
+  creating: 'Đang khởi tạo xử lý video...',
+  processing: 'Đang convert sang HLS (có thể mất vài chục giây)...',
+  ready: 'Xử lý xong!',
+};
 
 const AdminLessonPage = () => {
   const [sections, setSections] = useState([]);
@@ -23,6 +32,9 @@ const AdminLessonPage = () => {
     docUrl: '',
     docFileName: '',
   });
+  const [videoUploadStatus, setVideoUploadStatus] = useState('');
+  const [videoUploadError, setVideoUploadError] = useState('');
+  const [videoServerUrlInput, setVideoServerUrlInput] = useState(getVideoServerUrl());
 
   useEffect(() => {
     getSections().then(res => setSections(res.data || [])).catch(err => console.error(err));
@@ -85,7 +97,30 @@ const AdminLessonPage = () => {
     } else {
       setFormData({ title: '', durationMinutes: 0, orderIndex: 0, isActive: true, videoUrl: '', docUrl: '', docFileName: '' });
     }
+    setVideoUploadStatus('');
+    setVideoUploadError('');
     setIsModalOpen(true);
+  };
+
+  const handleVideoServerUrlChange = (e) => {
+    const val = e.target.value;
+    setVideoServerUrlInput(val);
+    setVideoServerUrl(val);
+  };
+
+  const handleVideoFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setVideoUploadError('');
+    try {
+      const streamUrl = await processVideoOnServer(file, setVideoUploadStatus);
+      setFormData(prev => ({ ...prev, videoUrl: streamUrl }));
+    } catch (err) {
+      setVideoUploadError(err.message || 'Xử lý video thất bại');
+    } finally {
+      setVideoUploadStatus('');
+      e.target.value = '';
+    }
   };
 
   const saveLesson = async (e) => {
@@ -120,6 +155,22 @@ const AdminLessonPage = () => {
   return (
     <div>
       <h1 style={{ marginBottom: '20px' }}>Quản lý Bài học</h1>
+
+      <div style={{ marginBottom: '20px', backgroundColor: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          🎬 Video Server URL{' '}
+          <span style={{ fontWeight: 'normal', color: '#7f8c8d', fontSize: '0.85rem' }}>
+            (URL của spring-video — sửa khi host qua Cloudflare Tunnel/ngrok/domain khác)
+          </span>
+        </label>
+        <input
+          type="text"
+          value={videoServerUrlInput}
+          onChange={handleVideoServerUrlChange}
+          placeholder="http://localhost:8082"
+          style={{ width: '100%', maxWidth: '500px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+        />
+      </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', backgroundColor: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
         <select value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)} className="form-select" style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px' }}>
@@ -174,10 +225,34 @@ const AdminLessonPage = () => {
           <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Link Google Drive Video</label>
             <input type="text" name="videoUrl" value={formData.videoUrl} onChange={handleInputChange} placeholder="https://drive.google.com/file/d/..." style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
-            {formData.videoUrl && getDriveEmbedUrl(formData.videoUrl) && (
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Hoặc tải video MP4 lên (tự động convert HLS)</label>
+            <input
+              type="file"
+              accept="video/mp4"
+              onChange={handleVideoFileChange}
+              disabled={!!videoUploadStatus}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+            {videoUploadStatus && (
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#2980b9' }}>
+                ⏳ {VIDEO_STATUS_LABEL[videoUploadStatus] || videoUploadStatus}
+              </p>
+            )}
+            {videoUploadError && (
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#e74c3c' }}>⚠ {videoUploadError}</p>
+            )}
+
+            {formData.videoUrl && (
               <div style={{ marginTop: '10px', border: '1px solid #eee', padding: '5px', borderRadius: '4px' }}>
                 <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#7f8c8d' }}>Preview Video:</p>
-                <iframe src={getDriveEmbedUrl(formData.videoUrl)} width="100%" height="250" allow="autoplay" style={{ border: 'none' }}></iframe>
+                {isVideoServerUrl(formData.videoUrl) ? (
+                  <HlsVideoPlayer src={formData.videoUrl} style={{ width: '100%', maxHeight: 250 }} />
+                ) : getDriveEmbedUrl(formData.videoUrl) ? (
+                  <iframe src={getDriveEmbedUrl(formData.videoUrl)} width="100%" height="250" allow="autoplay" style={{ border: 'none' }}></iframe>
+                ) : null}
               </div>
             )}
           </div>
