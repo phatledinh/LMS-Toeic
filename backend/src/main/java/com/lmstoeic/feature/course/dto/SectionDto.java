@@ -17,5 +17,6 @@ public class SectionDto {
     private String slug;
     private String description;
     private Integer orderIndex;
+    private Boolean isActive;
     private List<TopicDto> topics;
 }

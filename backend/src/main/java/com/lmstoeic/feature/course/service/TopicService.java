@@ -73,6 +73,7 @@ public class TopicService {
                 .slug(topic.getSlug())
                 .description(topic.getDescription())
                 .orderIndex(topic.getOrderIndex())
+                .isActive(topic.getIsActive())
                 .build();
     }
 }

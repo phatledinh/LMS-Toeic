@@ -2351,27 +2351,23 @@ const mockFlashcards = [
 export const login = async (data) => { await delay(); return { data: { token: 'mock-token', user: { id: 1, email: data.email, role: 'USER' } } }; };
 export const register = async (data) => { await delay(); return { data: { message: 'Đăng ký thành công' } }; };
 
-// Sections
-export const getSections = async () => { await delay(); return { data: mockSections }; };
-export const getSectionBySlug = async (slug) => { 
-  await delay(); 
-  const section = mockSections.find(s => s.slug === slug);
-  if (!section) throw new Error('Not found');
-  const sectionTopics = mockTopics.filter(t => t.sectionId === section.id).map(t => ({
-    ...t,
-    lessons: mockLessons.filter(l => l.topicId === t.id),
-    exercises: mockExercises.filter(e => e.topicId === t.id)
-  }));
-  return { data: { ...section, topics: sectionTopics } };
-};
+// Sections (real API)
+export const getSections = () =>
+  fetch(`${BASE_URL}/courses/sections`, { headers: getAuthHeaders() }).then(handleResponse);
 
-// Topics
+// Trả về section kèm topics[].lessons[]/.exercises[] lồng sẵn (mapToSectionDtoFull ở backend).
+export const getSectionBySlug = (slug) =>
+  fetch(`${BASE_URL}/courses/sections/${slug}`, { headers: getAuthHeaders() }).then(handleResponse);
+
+// Topics — chưa dùng ở client hiện tại (topics luôn lấy lồng qua getSectionBySlug),
+// giữ tạm mock vì backend chưa có endpoint public list-topics-by-section riêng.
 export const getTopicsBySection = async (sectionId) => { await delay(); return { data: mockTopics.filter(t => t.sectionId === Number(sectionId)) }; };
 export const getTopicById = async (id) => { await delay(); return { data: mockTopics.find(t => t.id === Number(id)) }; };
 
-// Lessons
+// Lessons (real API)
 export const getLessonsByTopic = async (topicId) => { await delay(); return { data: mockLessons.filter(l => l.topicId === Number(topicId)) }; };
-export const getLessonById = async (id) => { await delay(); return { data: mockLessons.find(l => l.id === Number(id)) }; };
+export const getLessonById = (id) =>
+  fetch(`${BASE_URL}/courses/lessons/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // Exercises
 export const getExercisesByTopic = async (topicId) => { await delay(); return { data: mockExercises.filter(e => e.topicId === Number(topicId)) }; };

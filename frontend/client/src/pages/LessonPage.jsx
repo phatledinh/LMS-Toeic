@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import HlsVideoPlayer from '../components/common/HlsVideoPlayer';
 import { getLessonById } from '../services/api';
+import { isVideoServerUrl } from '../services/videoServerApi';
 import { getFullUrl } from '../utils/urlUtils';
 import { pdfjs, Document, Page } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -49,7 +51,8 @@ const LessonPage = () => {
     mainRef.current?.scrollTo(0, 0);
   }, [id]);
 
-  const videoEmbedUrl = toEmbedUrl(lesson?.videoUrl);
+  const isHlsVideo = isVideoServerUrl(lesson?.videoUrl);
+  const videoEmbedUrl = !isHlsVideo && toEmbedUrl(lesson?.videoUrl);
   const docUrlFull = getFullUrl(lesson?.docUrl);
   // Nếu là Google Drive thì dùng toEmbedUrl, nếu là local file thì nhúng trực tiếp
   const docEmbedUrl = lesson?.docUrl?.includes('drive.google.com') ? toEmbedUrl(lesson.docUrl) : docUrlFull;
@@ -111,7 +114,16 @@ const LessonPage = () => {
           </div>
 
           {/* Video Player */}
-          {videoEmbedUrl && (
+          {isHlsVideo ? (
+            <div className="video-wrapper">
+              <HlsVideoPlayer
+                key={`video-${id}`}
+                src={lesson.videoUrl}
+                className="video-frame"
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+          ) : videoEmbedUrl && (
             <div className="video-wrapper">
               <iframe
                 key={`video-${id}`}

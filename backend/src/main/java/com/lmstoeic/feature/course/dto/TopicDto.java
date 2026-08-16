@@ -17,6 +17,7 @@ public class TopicDto {
     private String slug;
     private String description;
     private Integer orderIndex;
+    private Boolean isActive;
     private List<LessonDto> lessons;
     private List<ExerciseDto> exercises;
 }
