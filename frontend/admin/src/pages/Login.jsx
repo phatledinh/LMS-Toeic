@@ -18,13 +18,12 @@ const Login = () => {
       // response.data contains accessToken, fullName, role, etc.
       const { accessToken, fullName, role } = response.data;
       
-      login(accessToken, { email, fullName, role });
-      
-      if (role === 'ADMIN') {
-        navigate('/admin/courses');
-      } else {
+      if (role !== 'ADMIN') {
         setError('Tài khoản này không có quyền quản trị viên!');
+        return;
       }
+      login(accessToken, { email, fullName, role });
+      navigate('/admin/courses');
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
     }

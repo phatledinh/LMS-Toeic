@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDeck, generateMatchCards } from '../hooks/useDeck';
 import DeckSidebar from '../components/DeckSidebar';
+import { getTtsUrl } from '../services/api';
 
 const FlashcardMatchPage = () => {
   const { listId } = useParams();
@@ -58,8 +59,23 @@ const FlashcardMatchPage = () => {
   if (error) return <div className="fqp-container"><p className="error-msg" style={{padding:32}}>{error}</p></div>;
   if (!words.length) return <div className="fqp-container"><p style={{padding:32}}>Không có từ vựng</p></div>;
 
+  const playAudio = (text) => {
+    const audio = new Audio(getTtsUrl(text));
+    audio.play().catch(() => {
+      if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US';
+        window.speechSynthesis.speak(u);
+      }
+    });
+  };
+
   const handleClick = (card) => {
     if (matched.has(card.uid) || wrongPair || correctPair) return;
+
+    if (card.type === 'word') {
+      playAudio(card.text);
+    }
 
     if (!selected) {
       setSelected(card);

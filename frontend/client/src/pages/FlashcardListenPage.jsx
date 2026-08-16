@@ -17,16 +17,27 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
   const audioRef = useRef(null);
 
   useEffect(() => {
-    if (audioUrl && autoPlay && audioRef.current) {
-      audioRef.current.play().catch(e => console.log('Auto-play failed', e));
-      setIsPlaying(true);
+    if (audioUrl && audioRef.current) {
+      setCurrentTime(0);
+      setDuration(0);
+      if (autoPlay) {
+        setIsPlaying(true);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            console.log('Auto-play failed', e);
+            setIsPlaying(false);
+            handleError();
+          });
+        }
+      }
     }
   }, [audioUrl, autoPlay]);
 
   if (!audioUrl) return null;
 
   const formatTime = (time) => {
-    if (isNaN(time)) return "00:00";
+    if (isNaN(time) || !isFinite(time)) return "00:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
@@ -36,24 +47,46 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            console.log('Play failed', e);
+            handleError();
+          });
+        }
+        setIsPlaying(true);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   const handleTimeUpdate = () => {
-    setCurrentTime(audioRef.current.currentTime);
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+      const dur = audioRef.current.duration;
+      if (isFinite(dur) && dur > 0 && dur !== duration) {
+        setDuration(dur);
+      }
+    }
   };
 
   const handleLoadedMetadata = () => {
-    setDuration(audioRef.current.duration);
+    if (audioRef.current) {
+      const dur = audioRef.current.duration;
+      if (isFinite(dur) && dur > 0) {
+        setDuration(dur);
+      } else {
+        setDuration(1.5); // Fallback duration for streaming TTS so progress bar can move
+      }
+    }
   };
 
   const handleSeek = (e) => {
     const time = Number(e.target.value);
-    audioRef.current.currentTime = time;
+    if (audioRef.current && isFinite(audioRef.current.duration)) {
+      audioRef.current.currentTime = time;
+    }
     setCurrentTime(time);
   };
 
@@ -97,7 +130,10 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => handleError());
+      }
       setIsPlaying(true);
       setShowSpeedMenu(false);
     }
@@ -110,18 +146,49 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
       u.lang = 'en-US';
       u.rate = playbackRate;
       u.volume = isMuted ? 0 : volume;
-      u.onend = () => setIsPlaying(false);
+      
+      // Simulate progress bar for speech synthesis
+      const estimatedDuration = 1.5;
+      setDuration(estimatedDuration);
+      setCurrentTime(0);
+      setIsPlaying(true);
+      
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        if (elapsed >= estimatedDuration) {
+          clearInterval(interval);
+        } else {
+          setCurrentTime(elapsed);
+        }
+      }, 50);
+
+      u.onend = () => {
+        setIsPlaying(false);
+        setCurrentTime(estimatedDuration);
+        clearInterval(interval);
+      };
+      
+      u.onerror = () => {
+        setIsPlaying(false);
+        clearInterval(interval);
+      };
+
       window.speechSynthesis.speak(u);
     }
   };
 
   const speedOptions = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
 
+  const displayDur = isFinite(duration) && duration > 0 ? duration : 1.5;
+  const progressPercent = Math.min(100, Math.max(0, (currentTime / displayDur) * 100)) || 0;
+
   return (
     <div className="custom-audio-player">
       <audio
         ref={audioRef}
         src={audioUrl}
+        autoPlay={autoPlay}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => setIsPlaying(false)}
@@ -138,10 +205,10 @@ const ListenAudioPlayer = ({ audioUrl, autoPlay, word }) => {
         type="range"
         className="audio-progress-bar"
         min="0"
-        max={duration || 0}
+        max={displayDur}
         value={currentTime}
         onChange={handleSeek}
-        style={{ '--progress': `${(currentTime / (duration || 1)) * 100}%` }}
+        style={{ '--progress': `${progressPercent}%` }}
       />
       <span className="audio-time">{formatTime(currentTime)}</span>
       <div className="audio-volume-control">

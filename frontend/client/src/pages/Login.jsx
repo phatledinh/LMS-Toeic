@@ -20,12 +20,12 @@ const Login = () => {
       });
       
       const { accessToken, fullName, role } = response.data.data;
-      login(accessToken, { email, fullName, role });
       if (role === 'ADMIN') {
-        navigate('/admin/courses');
-      } else {
-        navigate('/');
+        setError('Tài khoản admin vui lòng đăng nhập qua cổng quản trị!');
+        return;
       }
+      login(accessToken, { email, fullName, role });
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
     }

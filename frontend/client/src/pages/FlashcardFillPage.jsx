@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDeck } from '../hooks/useDeck';
 import DeckSidebar from '../components/DeckSidebar';
+import { getTtsUrl } from '../services/api';
 
 const FlashcardFillPage = () => {
   const { listId } = useParams();
@@ -15,11 +16,26 @@ const FlashcardFillPage = () => {
   const [autoNext, setAutoNext] = useState(true);
   const [results, setResults] = useState({});
 
+  const word = words && words.length > 0 ? words[currentIndex] : null;
+
+  React.useEffect(() => {
+    if (word && word.word) {
+      const text = word.word;
+      const audio = new Audio(getTtsUrl(text));
+      audio.play().catch(() => {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'en-US';
+          window.speechSynthesis.speak(u);
+        }
+      });
+    }
+  }, [currentIndex, word]);
+
   if (loading) return <div className="fc-fill-layout"><p style={{padding:32}}>Đang tải...</p></div>;
   if (error) return <div className="fc-fill-layout"><p className="error-msg" style={{padding:32}}>{error}</p></div>;
-  if (!words.length) return <div className="fc-fill-layout"><p style={{padding:32}}>Không có từ vựng</p></div>;
-
-  const word = words[currentIndex];
+  if (!words || !words.length) return <div className="fc-fill-layout"><p style={{padding:32}}>Không có từ vựng</p></div>;
   
   let exampleSentence = word.examples && word.examples.length > 0 ? word.examples[0] : '';
   if (exampleSentence) {
