@@ -13,6 +13,7 @@ import com.lmstoeic.feature.course.dto.SectionDto;
 import com.lmstoeic.feature.course.dto.TopicDto;
 import com.lmstoeic.feature.course.dto.request.SectionRequest;
 import com.lmstoeic.feature.course.entity.Exercise;
+import com.lmstoeic.feature.course.entity.ExerciseType;
 import com.lmstoeic.feature.course.entity.Lesson;
 import com.lmstoeic.feature.course.entity.Section;
 import com.lmstoeic.feature.course.entity.Topic;
@@ -23,6 +24,15 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class SectionService {
+
+    private static final java.util.Map<ExerciseType, Integer> STANDARD_ORDER_INDEXES = java.util.Map.of(
+            ExerciseType.LISTENING_PART1, 1,
+            ExerciseType.LISTENING_PART2, 2,
+            ExerciseType.LISTENING_PART3, 3,
+            ExerciseType.LISTENING_PART4, 4,
+            ExerciseType.READING_PART5, 5,
+            ExerciseType.READING_PART6, 6,
+            ExerciseType.READING_PART7, 7);
 
     private final SectionRepository sectionRepository;
 
@@ -145,7 +155,7 @@ public class SectionService {
                 .id(exercise.getId())
                 .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
                 .totalQuestions(exercise.getTotalQuestions())
-                .orderIndex(exercise.getOrderIndex())
+                .orderIndex(STANDARD_ORDER_INDEXES.getOrDefault(exercise.getExerciseType(), exercise.getOrderIndex()))
                 .build();
     }
 }

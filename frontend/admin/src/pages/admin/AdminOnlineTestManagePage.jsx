@@ -127,17 +127,21 @@ const AdminOnlineTestManagePage = () => {
 
     return (selectedSection.topics || []).flatMap((topic) => (
       topic.exercises || []
-    ).map((exercise) => ({
-      ...exercise,
-      topicId: topic.id,
-      topicTitle: topic.title,
-      topicSlug: topic.slug,
-      topicDescription: topic.description || '',
-      sectionId: selectedSection.id,
-      sectionTitle: selectedSection.title,
-      sectionSlug: selectedSection.slug,
-      partLabel: getPartLabel(exercise.exerciseType),
-    }))).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    ).map((exercise) => {
+      const partConfig = getPartConfig(exercise.exerciseType);
+      return {
+        ...exercise,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        topicSlug: topic.slug,
+        topicDescription: topic.description || '',
+        sectionId: selectedSection.id,
+        sectionTitle: selectedSection.title,
+        sectionSlug: selectedSection.slug,
+        partLabel: partConfig.label,
+        orderIndex: partConfig.orderIndex,
+      };
+    })).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   }, [selectedSection]);
 
   const openCreateTest = () => {
