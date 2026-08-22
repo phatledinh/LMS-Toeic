@@ -36,10 +36,7 @@ const SECTION_INTROS = {
 };
 
 const getExerciseIntro = (exercise) => {
-  if (exercise?.sectionSlug === 'test-2-2026') {
-    return ZENLISH_TEST_2_INTROS[exercise.exerciseType] || null;
-  }
-  return null;
+  return ZENLISH_TEST_2_INTROS[exercise?.exerciseType] || null;
 };
 
 /** Audio Player dÃ¹ng chung cho Listening */
