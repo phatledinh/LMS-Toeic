@@ -7,22 +7,20 @@ import {
   adminDeleteSection,
   adminCreateTopic,
   adminUpdateTopic,
-  adminDeleteTopic,
   adminCreateExercise,
   adminUpdateExercise,
-  adminDeleteExercise,
 } from '../../services/api';
 import DataTable from '../../components/admin/DataTable';
 import Modal from '../../components/admin/Modal';
 
 const PARTS = [
-  { label: 'Part 1 - Listening hình ảnh', type: 'LISTENING_PART1', standardQuestions: 6 },
-  { label: 'Part 2 - Listening hỏi đáp', type: 'LISTENING_PART2', standardQuestions: 25 },
-  { label: 'Part 3 - Conversations', type: 'LISTENING_PART3', standardQuestions: 39 },
-  { label: 'Part 4 - Talks', type: 'LISTENING_PART4', standardQuestions: 30 },
-  { label: 'Part 5 - Reading grammar', type: 'READING_PART5', standardQuestions: 30 },
-  { label: 'Part 6 - Text completion', type: 'READING_PART6', standardQuestions: 16 },
-  { label: 'Part 7 - Reading comprehension', type: 'READING_PART7', standardQuestions: 54 },
+  { label: 'Part 1 - Listening hình ảnh', type: 'LISTENING_PART1', standardQuestions: 6, orderIndex: 1 },
+  { label: 'Part 2 - Listening hỏi đáp', type: 'LISTENING_PART2', standardQuestions: 25, orderIndex: 2 },
+  { label: 'Part 3 - Conversations', type: 'LISTENING_PART3', standardQuestions: 39, orderIndex: 3 },
+  { label: 'Part 4 - Talks', type: 'LISTENING_PART4', standardQuestions: 30, orderIndex: 4 },
+  { label: 'Part 5 - Reading grammar', type: 'READING_PART5', standardQuestions: 30, orderIndex: 5 },
+  { label: 'Part 6 - Text completion', type: 'READING_PART6', standardQuestions: 16, orderIndex: 6 },
+  { label: 'Part 7 - Reading comprehension', type: 'READING_PART7', standardQuestions: 54, orderIndex: 7 },
 ];
 
 const ONLINE_TEST_MARKER = '[ONLINE_TEST]';
@@ -67,6 +65,9 @@ const buildOnlineDescription = (description) => {
 };
 
 const getPartLabel = (exerciseType) => PARTS.find((part) => part.type === exerciseType)?.label || exerciseType;
+const getPartConfig = (exerciseType) => PARTS.find((part) => part.type === exerciseType) || PARTS[0];
+const getPartTitle = (sectionTitle, partConfig) => `${sectionTitle} - Part ${partConfig.orderIndex}`;
+const getPartSlug = (sectionSlug, partConfig) => `${sectionSlug}-part-${partConfig.orderIndex}`;
 
 const AdminOnlineTestManagePage = () => {
   const navigate = useNavigate();
@@ -184,6 +185,25 @@ const AdminOnlineTestManagePage = () => {
       const res = editingTest
         ? await adminUpdateSection(editingTest.id, payload)
         : await adminCreateSection(payload);
+
+      if (!editingTest) {
+        for (const part of PARTS) {
+          const topicRes = await adminCreateTopic(res.data.id, {
+            title: getPartTitle(payload.title, part),
+            slug: getPartSlug(payload.slug, part),
+            description: '',
+            orderIndex: part.orderIndex,
+            isActive: true,
+          });
+          await adminCreateExercise(topicRes.data.id, {
+            exerciseType: part.type,
+            totalQuestions: part.standardQuestions,
+            orderIndex: part.orderIndex,
+            isActive: true,
+          });
+        }
+      }
+
       setTestModalOpen(false);
       await fetchSections();
       setSelectedSectionId(String(editingTest?.id || res.data.id));
@@ -206,18 +226,22 @@ const AdminOnlineTestManagePage = () => {
 
   const openCreatePart = () => {
     if (!selectedSection) return;
+    if (partRows.length >= PARTS.length) {
+      alert('Một bộ đề TOEIC online chỉ được có đúng 7 part.');
+      return;
+    }
 
     const nextPart = PARTS.find((part) => !partRows.some((row) => row.exerciseType === part.type)) || PARTS[0];
-    const title = nextPart.label.split(' - ')[0];
+    const title = getPartTitle(selectedSection.title, nextPart);
 
     setEditingPart(null);
     setPartForm({
       title,
-      slug: slugify(title),
+      slug: getPartSlug(selectedSection.slug, nextPart),
       description: '',
       exerciseType: nextPart.type,
       totalQuestions: nextPart.standardQuestions,
-      orderIndex: partRows.length + 1,
+      orderIndex: nextPart.orderIndex,
     });
     setPartModalOpen(true);
   };
@@ -246,8 +270,11 @@ const AdminOnlineTestManagePage = () => {
 
       if (name === 'exerciseType') {
         const partConfig = PARTS.find((part) => part.type === value);
-        if (partConfig && (!prev.totalQuestions || Number(prev.totalQuestions) === 0)) {
+        if (partConfig) {
           next.totalQuestions = partConfig.standardQuestions;
+          next.orderIndex = partConfig.orderIndex;
+          next.title = selectedSection ? getPartTitle(selectedSection.title, partConfig) : next.title;
+          next.slug = selectedSection ? getPartSlug(selectedSection.slug, partConfig) : next.slug;
         }
       }
 
@@ -260,19 +287,34 @@ const AdminOnlineTestManagePage = () => {
     if (!selectedSection) return;
 
     try {
+      const partConfig = getPartConfig(partForm.exerciseType);
+      const duplicatePart = partRows.some((row) => (
+        row.exerciseType === partConfig.type && String(row.id) !== String(editingPart?.id)
+      ));
+
+      if (duplicatePart) {
+        alert(`${partConfig.label} đã tồn tại trong bộ đề này.`);
+        return;
+      }
+
+      if (!editingPart && partRows.length >= PARTS.length) {
+        alert('Một bộ đề TOEIC online chỉ được có đúng 7 part.');
+        return;
+      }
+
       if (editingPart) {
         await adminUpdateTopic(editingPart.topicId, {
           title: partForm.title.trim(),
           slug: partForm.slug.trim() || slugify(partForm.title),
           description: partForm.description,
-          orderIndex: Number(partForm.orderIndex) || 1,
+          orderIndex: partConfig.orderIndex,
           isActive: true,
           sectionId: Number(selectedSection.id),
         });
         await adminUpdateExercise(editingPart.id, {
-          exerciseType: partForm.exerciseType,
-          totalQuestions: Number(partForm.totalQuestions) || 0,
-          orderIndex: Number(partForm.orderIndex) || 1,
+          exerciseType: partConfig.type,
+          totalQuestions: partConfig.standardQuestions,
+          orderIndex: partConfig.orderIndex,
           topicId: Number(editingPart.topicId),
           isActive: true,
         });
@@ -281,13 +323,13 @@ const AdminOnlineTestManagePage = () => {
           title: partForm.title.trim(),
           slug: partForm.slug.trim() || slugify(partForm.title),
           description: partForm.description,
-          orderIndex: Number(partForm.orderIndex) || 1,
+          orderIndex: partConfig.orderIndex,
           isActive: true,
         });
         await adminCreateExercise(topicRes.data.id, {
-          exerciseType: partForm.exerciseType,
-          totalQuestions: Number(partForm.totalQuestions) || 0,
-          orderIndex: Number(partForm.orderIndex) || 1,
+          exerciseType: partConfig.type,
+          totalQuestions: partConfig.standardQuestions,
+          orderIndex: partConfig.orderIndex,
           isActive: true,
         });
       }
@@ -299,19 +341,11 @@ const AdminOnlineTestManagePage = () => {
     }
   };
 
-  const deletePart = async (part) => {
-    if (!window.confirm(`Xóa ${part.topicTitle}?`)) return;
-
-    try {
-      await adminDeleteExercise(part.id);
-      await adminDeleteTopic(part.topicId);
-      await fetchSections();
-    } catch (err) {
-      alert(err.message || 'Không xóa được part');
-    }
-  };
-
   const questionCount = partRows.reduce((sum, row) => sum + (Number(row.totalQuestions) || 0), 0);
+  const canAddPart = Boolean(selectedSection) && partRows.length < PARTS.length;
+  const partOptions = PARTS.filter((part) => (
+    editingPart?.exerciseType === part.type || !partRows.some((row) => row.exerciseType === part.type)
+  ));
 
   return (
     <div>
@@ -384,8 +418,8 @@ const AdminOnlineTestManagePage = () => {
             <button
               className="btn btn-primary"
               onClick={openCreatePart}
-              disabled={!selectedSection}
-              style={{ padding: '8px 12px', opacity: selectedSection ? 1 : 0.55 }}
+              disabled={!canAddPart}
+              style={{ padding: '8px 12px', opacity: canAddPart ? 1 : 0.55 }}
             >
               + Thêm part
             </button>
@@ -400,7 +434,6 @@ const AdminOnlineTestManagePage = () => {
             ]}
             data={partRows}
             onEdit={openEditPart}
-            onDelete={deletePart}
             customActions={[
               { label: 'Câu hỏi', color: '#f39c12', onClick: (row) => navigate(`/admin/exercises/${row.id}/questions`) },
               { label: 'Xem thử', color: '#2ecc71', onClick: (row) => window.open(`http://localhost:5173/exercises/${row.id}`, '_blank') },
@@ -452,17 +485,17 @@ const AdminOnlineTestManagePage = () => {
             <div>
               <label style={labelStyle}>Loại part</label>
               <select name="exerciseType" value={partForm.exerciseType} onChange={handlePartChange} style={fieldStyle}>
-                {PARTS.map((part) => <option key={part.type} value={part.type}>{part.label}</option>)}
+                {partOptions.map((part) => <option key={part.type} value={part.type}>{part.label}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Số câu dự kiến</label>
-              <input type="number" name="totalQuestions" value={partForm.totalQuestions} onChange={handlePartChange} style={fieldStyle} min="0" />
+              <input type="number" name="totalQuestions" value={partForm.totalQuestions} readOnly disabled style={{ ...fieldStyle, background: '#f3f4f6', cursor: 'not-allowed' }} />
             </div>
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Thứ tự hiển thị</label>
-            <input type="number" name="orderIndex" value={partForm.orderIndex} onChange={handlePartChange} style={fieldStyle} min="1" />
+            <input type="number" name="orderIndex" value={partForm.orderIndex} readOnly disabled style={{ ...fieldStyle, background: '#f3f4f6', cursor: 'not-allowed' }} />
           </div>
           <div style={{ textAlign: 'right' }}>
             <button type="button" className="btn" onClick={() => setPartModalOpen(false)} style={{ marginRight: 10, padding: '8px 16px' }}>Hủy</button>

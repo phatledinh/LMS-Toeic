@@ -7,4 +7,5 @@ import com.lmstoeic.feature.course.entity.ExerciseQuestion;
 
 @Repository
 public interface ExerciseQuestionRepository extends JpaRepository<ExerciseQuestion, Long> {
+    long countByExerciseId(Long exerciseId);
 }

@@ -2,6 +2,8 @@ package com.lmstoeic.feature.course.service;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import com.lmstoeic.feature.course.dto.request.ExerciseQuestionRequest;
 import com.lmstoeic.feature.course.entity.Exercise;
 import com.lmstoeic.feature.course.entity.ExerciseQuestion;
 import com.lmstoeic.feature.course.entity.ExerciseQuestionGroup;
+import com.lmstoeic.feature.course.entity.ExerciseType;
 import com.lmstoeic.feature.course.entity.Topic;
 import com.lmstoeic.feature.course.repository.ExerciseQuestionGroupRepository;
 import com.lmstoeic.feature.course.repository.ExerciseQuestionRepository;
@@ -28,6 +31,26 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ExerciseService {
+
+    private static final String ONLINE_TEST_MARKER = "[ONLINE_TEST]";
+
+    private static final Map<ExerciseType, Integer> STANDARD_QUESTION_COUNTS = Map.of(
+            ExerciseType.LISTENING_PART1, 6,
+            ExerciseType.LISTENING_PART2, 25,
+            ExerciseType.LISTENING_PART3, 39,
+            ExerciseType.LISTENING_PART4, 30,
+            ExerciseType.READING_PART5, 30,
+            ExerciseType.READING_PART6, 16,
+            ExerciseType.READING_PART7, 54);
+
+    private static final Map<ExerciseType, Integer> STANDARD_ORDER_INDEXES = Map.of(
+            ExerciseType.LISTENING_PART1, 1,
+            ExerciseType.LISTENING_PART2, 2,
+            ExerciseType.LISTENING_PART3, 3,
+            ExerciseType.LISTENING_PART4, 4,
+            ExerciseType.READING_PART5, 5,
+            ExerciseType.READING_PART6, 6,
+            ExerciseType.READING_PART7, 7);
 
     private final ExerciseRepository exerciseRepository;
     private final TopicRepository topicRepository;
@@ -75,12 +98,13 @@ public class ExerciseService {
     public ExerciseDto createExercise(ExerciseRequest request) {
         Topic topic = topicRepository.findById(request.getTopicId())
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", "id", request.getTopicId().toString()));
+        validateOnlineTestPart(topic, request.getExerciseType(), null);
 
         Exercise exercise = Exercise.builder()
                 .topic(topic)
                 .exerciseType(request.getExerciseType())
-                .totalQuestions(request.getTotalQuestions() != null ? request.getTotalQuestions() : 0)
-                .orderIndex(request.getOrderIndex())
+                .totalQuestions(resolveTotalQuestions(request))
+                .orderIndex(resolveOrderIndex(request))
                 .isActive(request.getIsActive())
                 .build();
 
@@ -93,11 +117,12 @@ public class ExerciseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise", "id", id.toString()));
         Topic topic = topicRepository.findById(request.getTopicId())
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", "id", request.getTopicId().toString()));
+        validateOnlineTestPart(topic, request.getExerciseType(), id);
 
         exercise.setTopic(topic);
         exercise.setExerciseType(request.getExerciseType());
-        exercise.setTotalQuestions(request.getTotalQuestions() != null ? request.getTotalQuestions() : 0);
-        exercise.setOrderIndex(request.getOrderIndex());
+        exercise.setTotalQuestions(resolveTotalQuestions(request));
+        exercise.setOrderIndex(resolveOrderIndex(request));
         exercise.setIsActive(request.getIsActive());
 
         return mapToExerciseDto(exerciseRepository.save(exercise));
@@ -114,6 +139,7 @@ public class ExerciseService {
     public ExerciseQuestionDto addQuestion(Long exerciseId, ExerciseQuestionRequest request) {
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise", "id", exerciseId.toString()));
+        validateQuestionLimit(exercise, 1);
 
         ExerciseQuestion question = buildQuestion(request);
         question.setExercise(exercise);
@@ -137,6 +163,8 @@ public class ExerciseService {
     public ExerciseQuestionGroupDto addQuestionGroup(Long exerciseId, ExerciseQuestionGroupRequest request) {
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise", "id", exerciseId.toString()));
+        int addedQuestions = request.getQuestions() == null ? 0 : request.getQuestions().size();
+        validateQuestionLimit(exercise, addedQuestions);
 
         ExerciseQuestionGroup group = ExerciseQuestionGroup.builder()
                 .exercise(exercise)
@@ -233,9 +261,89 @@ public class ExerciseService {
 
     private void refreshTotalQuestions(Exercise exercise) {
         Exercise managed = exerciseRepository.findById(exercise.getId()).orElse(exercise);
+        Integer standardTotal = STANDARD_QUESTION_COUNTS.get(managed.getExerciseType());
+        if (standardTotal != null) {
+            managed.setTotalQuestions(standardTotal);
+            exerciseRepository.save(managed);
+            return;
+        }
+
         int total = managed.getQuestions() == null ? 0 : managed.getQuestions().size();
         managed.setTotalQuestions(total);
         exerciseRepository.save(managed);
+    }
+
+    private void validateQuestionLimit(Exercise exercise, int addedQuestions) {
+        Integer standardTotal = STANDARD_QUESTION_COUNTS.get(exercise.getExerciseType());
+        if (standardTotal == null || addedQuestions <= 0) {
+            return;
+        }
+
+        long currentQuestions = exerciseQuestionRepository.countByExerciseId(exercise.getId());
+        if (currentQuestions + addedQuestions > standardTotal) {
+            throw new IllegalArgumentException(String.format(
+                    "%s chỉ được có đúng %d câu. Hiện đã có %d câu, không thể thêm %d câu nữa.",
+                    exercise.getExerciseType().name(),
+                    standardTotal,
+                    currentQuestions,
+                    addedQuestions));
+        }
+    }
+
+    private Integer resolveTotalQuestions(ExerciseRequest request) {
+        Integer standardTotal = STANDARD_QUESTION_COUNTS.get(request.getExerciseType());
+        return standardTotal != null
+                ? standardTotal
+                : request.getTotalQuestions() != null ? request.getTotalQuestions() : 0;
+    }
+
+    private Integer resolveOrderIndex(ExerciseRequest request) {
+        return STANDARD_ORDER_INDEXES.getOrDefault(request.getExerciseType(), request.getOrderIndex());
+    }
+
+    private void validateOnlineTestPart(Topic topic, ExerciseType exerciseType, Long currentExerciseId) {
+        if (!isOnlineTestTopic(topic) || !STANDARD_QUESTION_COUNTS.containsKey(exerciseType)) {
+            return;
+        }
+
+        List<Exercise> existingExercises = topic.getSection().getTopics().stream()
+                .filter(existingTopic -> Boolean.TRUE.equals(existingTopic.getIsActive()))
+                .flatMap(existingTopic -> existingTopic.getExercises() == null
+                        ? java.util.stream.Stream.<Exercise>empty()
+                        : existingTopic.getExercises().stream())
+                .filter(existingExercise -> Boolean.TRUE.equals(existingExercise.getIsActive()))
+                .filter(existingExercise -> !Objects.equals(existingExercise.getId(), currentExerciseId))
+                .filter(existingExercise -> STANDARD_QUESTION_COUNTS.containsKey(existingExercise.getExerciseType()))
+                .toList();
+
+        boolean duplicatePart = existingExercises.stream()
+                .anyMatch(existingExercise -> existingExercise.getExerciseType() == exerciseType);
+        if (duplicatePart) {
+            throw new IllegalArgumentException("Part này đã tồn tại trong bộ đề online.");
+        }
+
+        if (currentExerciseId == null && existingExercises.size() >= STANDARD_QUESTION_COUNTS.size()) {
+            throw new IllegalArgumentException("Một bộ đề TOEIC online chỉ được có đúng 7 part.");
+        }
+    }
+
+    private boolean isOnlineTestTopic(Topic topic) {
+        if (topic == null || topic.getSection() == null) {
+            return false;
+        }
+
+        String text = String.join(" ",
+                safeLower(topic.getSection().getSlug()),
+                safeLower(topic.getSection().getTitle()),
+                safeLower(topic.getSection().getDescription()));
+        return text.contains("online")
+                || text.contains("de-thi")
+                || text.contains("đề thi")
+                || text.contains(ONLINE_TEST_MARKER.toLowerCase());
+    }
+
+    private String safeLower(String value) {
+        return value == null ? "" : value.toLowerCase();
     }
 
     private ExerciseDto mapToExerciseDto(Exercise exercise) {
