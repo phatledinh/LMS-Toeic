@@ -13,5 +13,6 @@ public class ExerciseDto {
     private Long id;
     private String exerciseType;
     private Integer totalQuestions;
+    private Integer enteredQuestions;
     private Integer orderIndex;
 }

@@ -139,6 +139,8 @@ const AdminOnlineTestManagePage = () => {
         sectionTitle: selectedSection.title,
         sectionSlug: selectedSection.slug,
         partLabel: partConfig.label,
+        totalQuestions: partConfig.standardQuestions,
+        enteredQuestions: Number(exercise.enteredQuestions) || 0,
         orderIndex: partConfig.orderIndex,
       };
     })).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
@@ -346,6 +348,7 @@ const AdminOnlineTestManagePage = () => {
   };
 
   const questionCount = partRows.reduce((sum, row) => sum + (Number(row.totalQuestions) || 0), 0);
+  const enteredQuestionCount = partRows.reduce((sum, row) => sum + (Number(row.enteredQuestions) || 0), 0);
   const canAddPart = Boolean(selectedSection) && partRows.length < PARTS.length;
   const partOptions = PARTS.filter((part) => (
     editingPart?.exerciseType === part.type || !partRows.some((row) => row.exerciseType === part.type)
@@ -415,7 +418,7 @@ const AdminOnlineTestManagePage = () => {
               </h2>
               <p style={{ margin: '6px 0 0', color: '#6b7280' }}>
                 {selectedSection
-                  ? `${partRows.length} part, ${questionCount} câu hỏi`
+                  ? `${partRows.length} part, ${enteredQuestionCount}/${questionCount} câu hỏi`
                   : 'Chọn bộ đề bên trái để quản lý các part.'}
               </p>
             </div>
@@ -433,7 +436,7 @@ const AdminOnlineTestManagePage = () => {
             columns={[
               { header: 'Part', accessor: 'topicTitle' },
               { header: 'Loại', render: (row) => row.partLabel },
-              { header: 'Số câu', accessor: 'totalQuestions' },
+              { header: 'Số câu', render: (row) => `${row.enteredQuestions || 0}/${row.totalQuestions || 0}` },
               { header: 'Thứ tự', accessor: 'orderIndex' },
             ]}
             data={partRows}

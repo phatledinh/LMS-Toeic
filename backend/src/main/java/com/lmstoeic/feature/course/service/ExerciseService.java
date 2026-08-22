@@ -358,6 +358,7 @@ public class ExerciseService {
                 .id(exercise.getId())
                 .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
                 .totalQuestions(exercise.getTotalQuestions())
+                .enteredQuestions(Math.toIntExact(exerciseQuestionRepository.countByExerciseId(exercise.getId())))
                 .orderIndex(exercise.getOrderIndex())
                 .build();
     }

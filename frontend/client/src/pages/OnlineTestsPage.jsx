@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { getSectionBySlug, getSections } from '../services/api';
 
 const PART_CONFIG = [
-  { part: 1, type: 'LISTENING_PART1' },
-  { part: 2, type: 'LISTENING_PART2' },
-  { part: 3, type: 'LISTENING_PART3' },
-  { part: 4, type: 'LISTENING_PART4' },
-  { part: 5, type: 'READING_PART5' },
-  { part: 6, type: 'READING_PART6' },
-  { part: 7, type: 'READING_PART7' },
+  { part: 1, type: 'LISTENING_PART1', standardQuestions: 6 },
+  { part: 2, type: 'LISTENING_PART2', standardQuestions: 25 },
+  { part: 3, type: 'LISTENING_PART3', standardQuestions: 39 },
+  { part: 4, type: 'LISTENING_PART4', standardQuestions: 30 },
+  { part: 5, type: 'READING_PART5', standardQuestions: 30 },
+  { part: 6, type: 'READING_PART6', standardQuestions: 16 },
+  { part: 7, type: 'READING_PART7', standardQuestions: 54 },
 ];
 
 const ONLINE_TEST_MARKER = '[ONLINE_TEST]';
@@ -32,6 +32,13 @@ const getTestTitle = (section) => {
   if (section.slug === 'de-thi-online-toeic-demo') return 'Bài test giữa kì';
   return section.title || 'Bài test TOEIC';
 };
+
+const getEnteredQuestions = (exercise) => Number(exercise.enteredQuestions ?? exercise.totalQuestions) || 0;
+
+const isCompleteTest = (exercises) => PART_CONFIG.every((part) => {
+  const exercise = exercises.find((item) => item.exerciseType === part.type);
+  return exercise && getEnteredQuestions(exercise) >= part.standardQuestions;
+});
 
 const OnlineTestsPage = () => {
   const navigate = useNavigate();
@@ -73,7 +80,7 @@ const OnlineTestsPage = () => {
         const availableParts = PART_CONFIG.filter((part) =>
           exercises.some((exercise) => exercise.exerciseType === part.type)
         );
-        const questionCount = exercises.reduce((sum, exercise) => sum + (Number(exercise.totalQuestions) || 0), 0);
+        const questionCount = exercises.reduce((sum, exercise) => sum + getEnteredQuestions(exercise), 0);
 
         return {
           id: section.id,
@@ -84,9 +91,10 @@ const OnlineTestsPage = () => {
           exercises,
           availableParts,
           questionCount,
+          isComplete: isCompleteTest(exercises),
         };
       })
-      .filter((group) => group.exercises.length > 0)
+      .filter((group) => group.isComplete)
       .sort((a, b) => {
         if (a.slug === 'test-2-2026') return -1;
         if (b.slug === 'test-2-2026') return 1;
