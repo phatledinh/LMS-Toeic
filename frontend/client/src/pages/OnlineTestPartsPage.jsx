@@ -19,10 +19,31 @@ const TIME_OPTIONS = [
   { label: '45 phút', minutes: 45 },
 ];
 
+const LAST_TEST_RESULTS_KEY = 'toeic_last_test_results';
+
 const getTestTitle = (section) => {
   if (section.slug === 'test-2-2026') return 'TEST 2 - 2026';
   if (section.slug === 'de-thi-online-toeic-demo') return 'Bài test giữa kì';
   return section.title || 'Bài test TOEIC';
+};
+
+const formatResultDate = (value) => {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    date.getFullYear(),
+  ].join('-');
+};
+
+const formatDuration = (seconds) => {
+  const totalSeconds = Math.max(0, Number(seconds) || 0);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainSeconds = totalSeconds % 60;
+  return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainSeconds).padStart(2, '0')}`;
 };
 
 const OnlineTestPartsPage = () => {
@@ -34,6 +55,8 @@ const OnlineTestPartsPage = () => {
   const [choosePartsEnabled, setChoosePartsEnabled] = useState(true);
   const [selectedParts, setSelectedParts] = useState(() => PART_CONFIG.map((part) => part.part));
   const [selectedTime, setSelectedTime] = useState(120);
+  const [lastResult, setLastResult] = useState(null);
+  const [resultPopupOpen, setResultPopupOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -42,6 +65,16 @@ const OnlineTestPartsPage = () => {
       .then((res) => setSection(res.data))
       .catch(() => setError('Không thể tải bài test đã chọn.'))
       .finally(() => setLoading(false));
+  }, [testSlug]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(LAST_TEST_RESULTS_KEY) || '{}');
+      setLastResult(stored[testSlug] || null);
+      setResultPopupOpen(false);
+    } catch {
+      setLastResult(null);
+    }
   }, [testSlug]);
 
   const exercises = useMemo(() => {
@@ -93,7 +126,20 @@ const OnlineTestPartsPage = () => {
 
     const ids = selectedAvailableRows.map((row) => row.test.id).join(',');
     const parts = selectedAvailableRows.map((row) => row.part).join(',');
-    navigate(`/exercises/combined?ids=${ids}&parts=${parts}&time=${selectedTime}&test=${encodeURIComponent(testTitle)}`);
+    navigate(`/exercises/combined?ids=${ids}&parts=${parts}&time=${selectedTime}&testSlug=${encodeURIComponent(testSlug)}&test=${encodeURIComponent(testTitle)}`);
+  };
+
+  const openLastResultReview = () => {
+    if (!lastResult) return;
+    if (lastResult.reviewUrl) {
+      navigate(lastResult.reviewUrl);
+      return;
+    }
+
+    const rows = availablePartRows.filter((row) => row.test);
+    const ids = rows.map((row) => row.test.id).join(',');
+    const parts = rows.map((row) => row.part).join(',');
+    navigate(`/exercises/combined?ids=${ids}&parts=${parts}&time=${selectedTime}&testSlug=${encodeURIComponent(testSlug)}&test=${encodeURIComponent(testTitle)}&review=last`);
   };
 
   if (loading) {
@@ -175,7 +221,35 @@ const OnlineTestPartsPage = () => {
 
         <div className="part-picker-actions">
           <button onClick={startCombinedTest}>Bắt đầu bài test đã chọn</button>
-          <span>Gồm Listening và Reading, có thể bỏ chọn part chưa muốn làm.</span>
+          {lastResult ? (
+            <div className="last-test-result">
+              <button type="button" className="last-test-result-link" onClick={() => setResultPopupOpen(true)}>
+                [Xem kết quả lần trước]
+              </button>
+              {resultPopupOpen && (
+                <div className="last-test-result-popover" role="dialog" aria-modal="false" aria-labelledby="last-test-result-title">
+                  <h3 id="last-test-result-title">KẾT QUẢ BÀI LÀM TRƯỚC</h3>
+                  <p>Ngày hoàn thành: <strong>{formatResultDate(lastResult.completedAt)}</strong></p>
+                  <p>Thời gian hoàn thành: <strong>{formatDuration(lastResult.durationSeconds)}</strong></p>
+                  <p>Kết quả: <strong>{lastResult.totalToeicScore || 0}/990</strong></p>
+                  <div className="last-test-result-detail">
+                    <p><strong>Số câu đúng: {lastResult.correctCount || 0}/{lastResult.totalCount || 0}</strong></p>
+                    <p><strong>Listening: {lastResult.listeningCorrect || 0}/{lastResult.listeningTotal || 0} - {lastResult.listeningScore || 0} điểm</strong></p>
+                    <p><strong>Reading: {lastResult.readingCorrect || 0}/{lastResult.readingTotal || 0} - {lastResult.readingScore || 0} điểm</strong></p>
+                    {lastResult.partBreakdown?.map((part) => (
+                      <p key={part.part}>Part {part.part}: <strong>{part.correct}/{part.total}</strong></p>
+                    ))}
+                  </div>
+                  <div className="last-test-result-actions">
+                    <button type="button" onClick={openLastResultReview}>[Xem chi tiết &gt;]</button>
+                    <button type="button" onClick={() => setResultPopupOpen(false)}>[Đóng x]</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span>Gồm Listening và Reading, có thể bỏ chọn part chưa muốn làm.</span>
+          )}
         </div>
       </section>
     </main>

@@ -22,6 +22,7 @@ const EXERCISE_PART_LABELS = {
 const isGroupedExerciseType = (exerciseType) => exerciseType !== 'GRAMMAR' && exerciseType !== 'READING_PART5';
 const isListeningExerciseType = (exerciseType) => exerciseType?.startsWith('LISTENING_PART');
 const isReadingExerciseType = (exerciseType) => exerciseType?.startsWith('READING_PART');
+const LAST_TEST_RESULTS_KEY = 'toeic_last_test_results';
 
 const SECTION_INTROS = {
   LISTENING: {
@@ -1084,6 +1085,7 @@ const QuizPage = () => {
   const [answerReviewMode, setAnswerReviewMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(120 * 60);
+  const [initialDurationSeconds, setInitialDurationSeconds] = useState(120 * 60);
   const [submitNotice, setSubmitNotice] = useState('');
   const [submitResult, setSubmitResult] = useState(null);
   const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -1136,7 +1138,24 @@ const QuizPage = () => {
           setResultModalOpen(false);
           setIncompleteModalOpen(false);
           setShowPartBreakdown(false);
+          setInitialDurationSeconds(requestedMinutes * 60);
           setRemainingSeconds(requestedMinutes * 60);
+
+          if (query.get('review') === 'last') {
+            try {
+              const stored = JSON.parse(localStorage.getItem(LAST_TEST_RESULTS_KEY) || '{}');
+              const reviewResult = stored[query.get('testSlug')];
+              if (reviewResult?.answers) {
+                setAnswers(reviewResult.answers);
+                setSubmitResult(reviewResult);
+                setShowAnswer(true);
+                setAnswerReviewMode(true);
+                setCurrentIndex(1);
+              }
+            } catch {
+              setLoadError('Không tìm thấy kết quả lần làm trước để xem đáp án.');
+            }
+          }
         })
         .catch(() => {
           setExercise(null);
@@ -1160,6 +1179,7 @@ const QuizPage = () => {
         setResultModalOpen(false);
         setIncompleteModalOpen(false);
         setShowPartBreakdown(false);
+        setInitialDurationSeconds(requestedMinutes * 60);
         setRemainingSeconds(requestedMinutes * 60);
       })
       .catch(() => {
@@ -1576,9 +1596,7 @@ const QuizPage = () => {
       };
     });
 
-    setShowAnswer(false);
-    setAnswerReviewMode(false);
-    setSubmitResult({
+    const result = {
       correctCount,
       totalCount,
       answered,
@@ -1591,7 +1609,25 @@ const QuizPage = () => {
       readingScore,
       totalToeicScore: listeningScore + readingScore,
       partBreakdown,
-    });
+      completedAt: new Date().toISOString(),
+      durationSeconds: Math.max(0, initialDurationSeconds - remainingSeconds),
+      testSlug: new URLSearchParams(location.search).get('testSlug') || exercise?.sectionSlug || exercise?.topicSlug || String(slug),
+      testTitle: new URLSearchParams(location.search).get('test') || partName,
+      answers,
+      reviewUrl: `/exercises/${slug}${location.search}${location.search ? '&' : '?'}review=last`,
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem(LAST_TEST_RESULTS_KEY) || '{}');
+      stored[result.testSlug] = result;
+      localStorage.setItem(LAST_TEST_RESULTS_KEY, JSON.stringify(stored));
+    } catch {
+      // Ignore storage failures; the result modal still shows immediately.
+    }
+
+    setShowAnswer(false);
+    setAnswerReviewMode(false);
+    setSubmitResult(result);
     setSubmitNotice('');
     setIncompleteModalOpen(false);
     setShowPartBreakdown(false);

@@ -1038,6 +1038,84 @@ body {
   font-weight: 650;
 }
 
+.last-test-result {
+  position: relative;
+}
+
+.part-picker-actions .last-test-result-link {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.part-picker-actions .last-test-result-link:hover {
+  color: #244c90;
+}
+
+.last-test-result-popover {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 16px);
+  z-index: 10;
+  width: min(350px, calc(100vw - 48px));
+  padding: 28px 32px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.25);
+  color: #4b5563;
+  transform: translateX(-50%);
+}
+
+.last-test-result-popover h3 {
+  margin: 0 0 18px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.last-test-result-popover p {
+  margin: 8px 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.last-test-result-popover strong {
+  color: #3f3f46;
+  font-weight: 900;
+}
+
+.last-test-result-detail {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.last-test-result-detail p {
+  font-size: 14px;
+}
+
+.last-test-result-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.part-picker-actions .last-test-result-actions button {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 750;
+}
+
 @media (max-width: 760px) {
   .part-picker-panel {
     padding: 18px;
@@ -1061,6 +1139,11 @@ body {
   .part-picker-name,
   .part-picker-count {
     padding: 0 12px;
+  }
+
+  .last-test-result-popover {
+    left: 0;
+    transform: none;
   }
 }
 
