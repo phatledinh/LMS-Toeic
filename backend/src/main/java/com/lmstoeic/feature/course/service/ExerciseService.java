@@ -150,13 +150,15 @@ public class ExerciseService {
 
     @Transactional
     public void deleteQuestion(Long questionId) {
-        ExerciseQuestion question = exerciseQuestionRepository.findById(questionId)
-                .orElseThrow(() -> new ResourceNotFoundException("ExerciseQuestion", "id", questionId.toString()));
-        Exercise exercise = question.getExercise();
-        exerciseQuestionRepository.delete(question);
-        if (exercise != null) {
-            refreshTotalQuestions(exercise);
+        Long exerciseId = exerciseQuestionRepository.findExerciseIdByQuestionId(questionId);
+        if (exerciseId == null) {
+            throw new ResourceNotFoundException("ExerciseQuestion", "id", questionId.toString());
         }
+
+        exerciseQuestionRepository.deletePracticeStatsByQuestionId(questionId);
+        exerciseQuestionRepository.deleteTopicTagsByQuestionId(questionId);
+        exerciseQuestionRepository.deleteQuestionRowById(questionId);
+        exerciseRepository.findById(exerciseId).ifPresent(this::refreshTotalQuestions);
     }
 
     @Transactional
@@ -203,13 +205,18 @@ public class ExerciseService {
 
     @Transactional
     public void deleteQuestionGroup(Long groupId) {
-        ExerciseQuestionGroup group = exerciseQuestionGroupRepository.findById(groupId)
-                .orElseThrow(() -> new ResourceNotFoundException("ExerciseQuestionGroup", "id", groupId.toString()));
-        Exercise exercise = group.getExercise();
-        exerciseQuestionGroupRepository.delete(group);
-        if (exercise != null) {
-            refreshTotalQuestions(exercise);
+        Long exerciseId = exerciseQuestionGroupRepository.findExerciseIdByGroupId(groupId);
+        if (exerciseId == null) {
+            throw new ResourceNotFoundException("ExerciseQuestionGroup", "id", groupId.toString());
         }
+
+        exerciseQuestionRepository.deletePracticeStatsByGroupId(groupId);
+        exerciseQuestionRepository.deleteTopicTagsByGroupId(groupId);
+        exerciseQuestionRepository.deleteByGroupId(groupId);
+        exerciseQuestionGroupRepository.deleteTopicTagsByGroupId(groupId);
+        exerciseQuestionGroupRepository.deleteContentBlocksByGroupId(groupId);
+        exerciseQuestionGroupRepository.deleteGroupRowById(groupId);
+        exerciseRepository.findById(exerciseId).ifPresent(this::refreshTotalQuestions);
     }
 
     private ExerciseQuestionGroupDto mapGroup(ExerciseQuestionGroup group) {
@@ -268,7 +275,7 @@ public class ExerciseService {
             return;
         }
 
-        int total = managed.getQuestions() == null ? 0 : managed.getQuestions().size();
+        int total = Math.toIntExact(exerciseQuestionRepository.countByExerciseId(managed.getId()));
         managed.setTotalQuestions(total);
         exerciseRepository.save(managed);
     }

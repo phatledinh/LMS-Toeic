@@ -436,7 +436,6 @@ const AdminOnlineTestManagePage = () => {
             onEdit={openEditPart}
             customActions={[
               { label: 'Câu hỏi', color: '#f39c12', onClick: (row) => navigate(`/admin/exercises/${row.id}/questions`) },
-              { label: 'Xem thử', color: '#2ecc71', onClick: (row) => window.open(`http://localhost:5173/exercises/${row.id}`, '_blank') },
             ]}
           />
         </section>
