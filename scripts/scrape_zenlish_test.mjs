@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const [,, htmlPath, outDirArg] = process.argv;
+const [,, htmlPath, outDirArg, slugArg = 'test-2-2026', titleArg = 'TEST 2 - 2026', sourceUrlArg = 'https://zenlishtoeic.vn/stm-quizzes/test-2-2026/'] = process.argv;
 
 if (!htmlPath || !outDirArg) {
-  console.error('Usage: node scripts/scrape_zenlish_test.mjs <raw-html> <out-dir>');
+  console.error('Usage: node scripts/scrape_zenlish_test.mjs <raw-html> <out-dir> [slug] [title] [source-url]');
   process.exit(1);
 }
 
@@ -109,6 +109,11 @@ function extractMediaUrls(...values) {
   return [...urls];
 }
 
+function listValues(value) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : Object.values(value);
+}
+
 const testId = evaluateExpression('$testID');
 const duration = evaluateExpression('$testDuration');
 const durationMeasure = evaluateExpression('$testDurationMeasure');
@@ -121,11 +126,11 @@ const mediaUrls = new Set();
 
 for (const part of parts) {
   if (part.term_audio) mediaUrls.add(part.term_audio);
-  for (const question of part.questions ?? []) {
+  for (const question of listValues(part.questions)) {
     if (question.audio_url) mediaUrls.add(question.audio_url);
     extractMediaUrls(part.term_desc, question.content).forEach((url) => mediaUrls.add(url));
 
-    for (const subQuestion of question.sub_questions ?? []) {
+    for (const subQuestion of listValues(question.sub_questions)) {
       questionCount += 1;
       const choices = (subQuestion.answer ?? []).map((choice) => ({
         choice: choice.choice,
@@ -160,10 +165,10 @@ for (const part of parts) {
 }
 
 const normalized = {
-  source_url: 'https://zenlishtoeic.vn/stm-quizzes/test-2-2026/',
+  source_url: sourceUrlArg,
   scraped_at: new Date().toISOString(),
   test_id: testId,
-  title: 'TEST 2 - 2026',
+  title: titleArg,
   duration,
   duration_measure: durationMeasure,
   parts_count: parts.length,
@@ -175,7 +180,7 @@ const normalized = {
 };
 
 const markdown = [
-  '# TEST 2 - 2026',
+  `# ${titleArg}`,
   '',
   `Source: ${normalized.source_url}`,
   `Test ID: ${testId}`,
@@ -203,12 +208,12 @@ const markdown = [
   ]),
 ].join('\n');
 
-fs.writeFileSync(path.join(outDir, 'test-2-2026.raw-parts.json'), JSON.stringify(parts, null, 2), 'utf8');
-fs.writeFileSync(path.join(outDir, 'test-2-2026.normalized.json'), JSON.stringify(normalized, null, 2), 'utf8');
-fs.writeFileSync(path.join(outDir, 'test-2-2026.questions.json'), JSON.stringify(flatQuestions, null, 2), 'utf8');
-fs.writeFileSync(path.join(outDir, 'test-2-2026.answer-key.json'), JSON.stringify(answerKey, null, 2), 'utf8');
-fs.writeFileSync(path.join(outDir, 'test-2-2026.media-urls.txt'), `${[...mediaUrls].join('\n')}\n`, 'utf8');
-fs.writeFileSync(path.join(outDir, 'test-2-2026.md'), markdown, 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.raw-parts.json`), JSON.stringify(parts, null, 2), 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.normalized.json`), JSON.stringify(normalized, null, 2), 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.questions.json`), JSON.stringify(flatQuestions, null, 2), 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.answer-key.json`), JSON.stringify(answerKey, null, 2), 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.media-urls.txt`), `${[...mediaUrls].join('\n')}\n`, 'utf8');
+fs.writeFileSync(path.join(outDir, `${slugArg}.md`), markdown, 'utf8');
 
 console.log(JSON.stringify({
   test_id: testId,
