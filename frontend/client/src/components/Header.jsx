@@ -15,8 +15,8 @@ const Header = () => {
     <header className="header">
       <Link to="/" className="header-logo" style={{ textDecoration: 'none' }}>STUDY4</Link>
       <nav className="header-nav">
-        <a href="#">Đề thi online</a>
-        <a href="#">Flashcards</a>
+        <Link to="/online-tests">{'\u0110\u1ec1 thi online'}</Link>
+        <Link to="/flashcards">Flashcards</Link>
 
         {user ? (
           <div className="header-user">

@@ -18,6 +18,8 @@ import FlashcardDictationPage from './pages/FlashcardDictationPage';
 import FlashcardListenPage from './pages/FlashcardListenPage';
 import PracticePage from './pages/PracticePage';
 import DictationPage from './pages/DictationPage';
+import OnlineTestsPage from './pages/OnlineTestsPage';
+import OnlineTestPartsPage from './pages/OnlineTestPartsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './index.css';
 import './flashcard.css';
@@ -28,12 +30,25 @@ const PrivateRoute = ({ children }) => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  const hideGlobalHeader = location.pathname.startsWith('/exercises/') && !location.pathname.endsWith('/dictation');
+
   return (
     <div className="app-container">
-      <Header />
+      {!hideGlobalHeader && <Header />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/online-tests" element={
+          <PrivateRoute>
+            <OnlineTestsPage />
+          </PrivateRoute>
+        } />
+        <Route path="/online-tests/:testSlug/parts" element={
+          <PrivateRoute>
+            <OnlineTestPartsPage />
+          </PrivateRoute>
+        } />
 
         {/* Trang chủ */}
         <Route path="/" element={

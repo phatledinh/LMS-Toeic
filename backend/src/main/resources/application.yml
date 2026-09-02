@@ -8,16 +8,16 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/lms_toeic?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Ho_Chi_Minh&createDatabaseIfNotExist=true
     username: root
-    password: 123456
+    password:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
+        dialect: org.hibernate.dialect.MariaDBDialect
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -31,3 +31,6 @@ jwt:
     access-token-expiration: 86400000000
     #7d
     refresh-expiration: 604800000
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:103904649059-ukvh1nq2frat6nd61gjv3k0o3vlk2joj.apps.googleusercontent.com}

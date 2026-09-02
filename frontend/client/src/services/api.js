@@ -2370,13 +2370,13 @@ export const getLessonById = (id) =>
   fetch(`${BASE_URL}/courses/lessons/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // Exercises
-export const getExercisesByTopic = async (topicId) => { await delay(); return { data: mockExercises.filter(e => e.topicId === Number(topicId)) }; };
-export const getExerciseDetailById = async (id) => { 
-  await delay(); 
-  const exercise = mockExercises.find(e => e.id === Number(id));
-  if (!exercise) throw new Error('Not found');
-  return { data: { ...exercise, questions: mockQuestions } };
+export const getExercisesByTopic = async (topicId) => {
+  await delay();
+  return { data: mockExercises.filter(e => e.topicId === Number(topicId)) };
 };
+
+export const getExerciseDetailById = (id) =>
+  fetch(`${BASE_URL}/exercises/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // Flashcards (Decks)
 export const getSystemDecks = () =>

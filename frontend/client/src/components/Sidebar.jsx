@@ -3,6 +3,17 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getSections } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+const ONLINE_TEST_MARKER = '[ONLINE_TEST]';
+
+const isOnlineTestSection = (section) => {
+  const text = `${section.slug || ''} ${section.title || ''} ${section.description || ''}`.toLowerCase();
+  return text.includes('online')
+    || text.includes('de-thi')
+    || text.includes('đề thi')
+    || text.includes('test-')
+    || text.includes(ONLINE_TEST_MARKER.toLowerCase());
+};
+
 const Sidebar = () => {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +42,7 @@ const Sidebar = () => {
         {loading ? (
           <li className="sidebar-loading">Đang tải...</li>
         ) : (
-          sections.map((section) => {
+          sections.filter((section) => !isOnlineTestSection(section)).map((section) => {
             const isFlashcardSection = section.slug === 'tu-vung-toeic';
             const targetUrl = isFlashcardSection ? '/flashcards' : `/sections/${section.slug}`;
             const isActive = (slug === section.slug) || (isFlashcardSection && location.pathname.startsWith('/flashcards'));

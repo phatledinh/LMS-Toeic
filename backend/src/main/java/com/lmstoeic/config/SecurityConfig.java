@@ -16,6 +16,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -32,9 +33,12 @@ import com.lmstoeic.security.PermissionAuthorizationManager;
 public class SecurityConfig {
 
     private final PermissionAuthorizationManager permissionAuthorizationManager;
+    private final JwtAuthenticationConverter jwtAuthenticationConverter;
 
-    public SecurityConfig(PermissionAuthorizationManager permissionAuthorizationManager) {
+    public SecurityConfig(PermissionAuthorizationManager permissionAuthorizationManager,
+            JwtAuthenticationConverter jwtAuthenticationConverter) {
         this.permissionAuthorizationManager = permissionAuthorizationManager;
+        this.jwtAuthenticationConverter = jwtAuthenticationConverter;
 
     }
 
@@ -43,6 +47,7 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api/v1/auth/login",
+            "/api/v1/auth/google",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
             "/api/v1/auth/me",
@@ -56,6 +61,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000",
                 "http://127.0.0.1:3000", "http://localhost:4173", "http://localhost:5173",
+                "http://localhost:4174", "http://localhost:5174",
                 "https://yourdomain.com"));
 
         configuration.setAllowedMethods(
@@ -81,8 +87,7 @@ public class SecurityConfig {
                         .requestMatchers(WHITELIST).permitAll()
                         .anyRequest().access(permissionAuthorizationManager))
 
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {
-                }))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler()));

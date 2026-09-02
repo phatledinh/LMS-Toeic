@@ -14,16 +14,22 @@ const AdminSidebar = () => {
           Quản trị
         </li>
         <li className={location.pathname.startsWith('/admin/courses') ? 'active' : ''}>
-          <Link to="/admin/courses">Quản lý Khóa học</Link>
+          <Link to="/admin/courses">Quản lý khóa học</Link>
         </li>
         <li className={location.pathname.startsWith('/admin/lessons') ? 'active' : ''}>
-          <Link to="/admin/lessons">Quản lý Bài học</Link>
+          <Link to="/admin/lessons">Quản lý bài học</Link>
         </li>
         <li className={location.pathname.startsWith('/admin/exercises') ? 'active' : ''}>
-          <Link to="/admin/exercises">Quản lý Bài tập</Link>
+          <Link to="/admin/exercises">Quản lý bài tập</Link>
+        </li>
+        <li className={location.pathname.startsWith('/admin/online-tests') ? 'active' : ''}>
+          <Link to="/admin/online-tests">Quản lý đề thi online</Link>
         </li>
         <li className={location.pathname.startsWith('/admin/flashcards') ? 'active' : ''}>
-          <Link to="/admin/flashcards">Quản lý Từ vựng</Link>
+          <Link to="/admin/flashcards">Quản lý từ vựng</Link>
+        </li>
+        <li className={location.pathname.startsWith('/admin/accounts') ? 'active' : ''}>
+          <Link to="/admin/accounts">Quản lý tài khoản</Link>
         </li>
       </ul>
     </aside>

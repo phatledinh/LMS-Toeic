@@ -13,9 +13,11 @@ import com.lmstoeic.feature.course.dto.SectionDto;
 import com.lmstoeic.feature.course.dto.TopicDto;
 import com.lmstoeic.feature.course.dto.request.SectionRequest;
 import com.lmstoeic.feature.course.entity.Exercise;
+import com.lmstoeic.feature.course.entity.ExerciseType;
 import com.lmstoeic.feature.course.entity.Lesson;
 import com.lmstoeic.feature.course.entity.Section;
 import com.lmstoeic.feature.course.entity.Topic;
+import com.lmstoeic.feature.course.repository.ExerciseQuestionRepository;
 import com.lmstoeic.feature.course.repository.SectionRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -24,11 +26,33 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SectionService {
 
+    private static final String ONLINE_TEST_MARKER = "[ONLINE_TEST]";
+
+    private static final java.util.Map<ExerciseType, Integer> STANDARD_QUESTION_COUNTS = java.util.Map.of(
+            ExerciseType.LISTENING_PART1, 6,
+            ExerciseType.LISTENING_PART2, 25,
+            ExerciseType.LISTENING_PART3, 39,
+            ExerciseType.LISTENING_PART4, 30,
+            ExerciseType.READING_PART5, 30,
+            ExerciseType.READING_PART6, 16,
+            ExerciseType.READING_PART7, 54);
+
+    private static final java.util.Map<ExerciseType, Integer> STANDARD_ORDER_INDEXES = java.util.Map.of(
+            ExerciseType.LISTENING_PART1, 1,
+            ExerciseType.LISTENING_PART2, 2,
+            ExerciseType.LISTENING_PART3, 3,
+            ExerciseType.LISTENING_PART4, 4,
+            ExerciseType.READING_PART5, 5,
+            ExerciseType.READING_PART6, 6,
+            ExerciseType.READING_PART7, 7);
+
     private final SectionRepository sectionRepository;
+    private final ExerciseQuestionRepository exerciseQuestionRepository;
 
     @Transactional(readOnly = true)
     public List<SectionDto> getAllSections() {
         return sectionRepository.findAllByIsActiveTrueOrderByOrderIndexAsc().stream()
+                .filter((section) -> !isOnlineTestSection(section) || isCompleteOnlineTestSection(section))
                 .map(this::mapToSectionDtoBasic)
                 .collect(Collectors.toList());
     }
@@ -44,6 +68,9 @@ public class SectionService {
     public SectionDto getSectionBySlug(String slug) {
         Section section = sectionRepository.findBySlugAndIsActiveTrue(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Section", "slug", slug));
+        if (isOnlineTestSection(section) && !isCompleteOnlineTestSection(section)) {
+            throw new ResourceNotFoundException("Section", "slug", slug);
+        }
         return mapToSectionDtoFull(section);
     }
 
@@ -147,7 +174,49 @@ public class SectionService {
                 .id(exercise.getId())
                 .exerciseType(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
                 .totalQuestions(exercise.getTotalQuestions())
-                .orderIndex(exercise.getOrderIndex())
+                .enteredQuestions(Math.toIntExact(exerciseQuestionRepository.countByExerciseId(exercise.getId())))
+                .orderIndex(STANDARD_ORDER_INDEXES.getOrDefault(exercise.getExerciseType(), exercise.getOrderIndex()))
                 .build();
+    }
+
+    private boolean isOnlineTestSection(Section section) {
+        String text = String.format("%s %s %s",
+                section.getSlug() == null ? "" : section.getSlug(),
+                section.getTitle() == null ? "" : section.getTitle(),
+                section.getDescription() == null ? "" : section.getDescription()).toLowerCase();
+
+        return text.contains("online")
+                || text.contains("de-thi")
+                || text.contains("đề thi")
+                || text.contains("test-")
+                || text.contains(ONLINE_TEST_MARKER.toLowerCase());
+    }
+
+    private boolean isCompleteOnlineTestSection(Section section) {
+        java.util.Map<ExerciseType, Long> enteredByType = new java.util.EnumMap<>(ExerciseType.class);
+
+        if (section.getTopics() == null) {
+            return false;
+        }
+
+        for (Topic topic : section.getTopics()) {
+            if (!Boolean.TRUE.equals(topic.getIsActive()) || topic.getExercises() == null) {
+                continue;
+            }
+
+            for (Exercise exercise : topic.getExercises()) {
+                if (!Boolean.TRUE.equals(exercise.getIsActive())
+                        || exercise.getExerciseType() == null
+                        || !STANDARD_QUESTION_COUNTS.containsKey(exercise.getExerciseType())) {
+                    continue;
+                }
+
+                long enteredQuestions = exerciseQuestionRepository.countByExerciseId(exercise.getId());
+                enteredByType.merge(exercise.getExerciseType(), enteredQuestions, Long::sum);
+            }
+        }
+
+        return STANDARD_QUESTION_COUNTS.entrySet().stream()
+                .allMatch((entry) -> enteredByType.getOrDefault(entry.getKey(), 0L) >= entry.getValue());
     }
 }

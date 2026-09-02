@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.lmstoeic.common.dto.ApiResponse;
 import com.lmstoeic.common.exception.InvalidTokenException;
+import com.lmstoeic.feature.auth.dto.GoogleLoginRequest;
 import com.lmstoeic.feature.auth.dto.LoginRequest;
 import com.lmstoeic.feature.auth.dto.LoginResponse;
 import com.lmstoeic.feature.auth.dto.RefreshRequest;
@@ -53,6 +54,21 @@ public class AuthController {
         setRefreshTokenCookie(httpResponse, loginResponse.refreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", loginResponse));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<LoginResponse>> googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String deviceInfo = httpRequest.getHeader("User-Agent");
+        String ipAddress = extractClientIp(httpRequest);
+
+        LoginResponse loginResponse = authService.loginWithGoogle(request, deviceInfo, ipAddress);
+        setRefreshTokenCookie(httpResponse, loginResponse.refreshToken());
+
+        return ResponseEntity.ok(ApiResponse.success("Google login successful", loginResponse));
     }
 
     @PostMapping("/register")

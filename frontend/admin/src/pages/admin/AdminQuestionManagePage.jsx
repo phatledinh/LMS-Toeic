@@ -11,6 +11,25 @@ import GroupPart2Form from '../../components/admin/exercise-forms/GroupPart2Form
 import GroupPart34Form from '../../components/admin/exercise-forms/GroupPart34Form';
 import GroupPart67Form from '../../components/admin/exercise-forms/GroupPart67Form';
 
+const STANDARD_QUESTION_COUNTS = {
+  LISTENING_PART1: 6,
+  LISTENING_PART2: 25,
+  LISTENING_PART3: 39,
+  LISTENING_PART4: 30,
+  READING_PART5: 30,
+  READING_PART6: 16,
+  READING_PART7: 54,
+};
+
+const countActualQuestions = (exercise) => {
+  const flatQuestions = exercise?.questions?.length || 0;
+  const groupedQuestions = (exercise?.questionGroups || []).reduce(
+    (sum, group) => sum + (group.questions?.length || 0),
+    0,
+  );
+  return flatQuestions + groupedQuestions;
+};
+
 const AdminQuestionManagePage = () => {
   const { exerciseId } = useParams();
   const navigate = useNavigate();
@@ -41,9 +60,17 @@ const AdminQuestionManagePage = () => {
   };
 
   const isFlatLayout = exercise && (exercise.exerciseType === 'GRAMMAR' || exercise.exerciseType === 'READING_PART5');
+  const standardQuestionCount = STANDARD_QUESTION_COUNTS[exercise?.exerciseType] || null;
+  const actualQuestionCount = countActualQuestions(exercise);
+  const reachedQuestionLimit = standardQuestionCount !== null && actualQuestionCount >= standardQuestionCount;
 
   // --- Flat Questions Handlers ---
   const handleOpenQuestionModal = () => {
+    if (reachedQuestionLimit) {
+      alert(`${exercise.exerciseType} chỉ được có đúng ${standardQuestionCount} câu.`);
+      return;
+    }
+
     const nextNum = exercise?.questions?.length ? Math.max(...exercise.questions.map(q => q.questionNumber)) + 1 : 1;
     setSelectedQuestion({ questionNumber: nextNum });
     setIsQuestionModalOpen(true);
@@ -73,6 +100,11 @@ const AdminQuestionManagePage = () => {
 
   // --- Question Group Handlers ---
   const handleOpenGroupModal = (group = null) => {
+    if (!group && reachedQuestionLimit) {
+      alert(`${exercise.exerciseType} chỉ được có đúng ${standardQuestionCount} câu.`);
+      return;
+    }
+
     if (group) {
       setSelectedGroup(group);
     } else {
@@ -122,7 +154,9 @@ const AdminQuestionManagePage = () => {
       </div>
       <div style={{ marginBottom: '20px', padding: '20px', backgroundColor: '#fff', borderLeft: '4px solid #3498db', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
         <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}><b>Loại bài tập:</b> <span style={{ color: '#2980b9' }}>{exercise.exerciseType}</span></p>
-        <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}><b>Tổng số câu:</b> {exercise.totalQuestions}</p>
+        <p style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}>
+          <b>Số câu đã nhập:</b> {actualQuestionCount}{standardQuestionCount ? `/${standardQuestionCount}` : ''}
+        </p>
         <p style={{ color: '#e74c3c', fontSize: '0.95rem', margin: 0, marginTop: '10px', padding: '10px', backgroundColor: '#fdf3f2', borderRadius: '4px' }}>
           <i style={{ marginRight: '5px' }}>⚠️</i> <b>Lưu ý:</b> Hệ thống hiện chưa hỗ trợ sửa trực tiếp text câu hỏi/đáp án. Nếu nhập sai, vui lòng Xóa nhóm/câu hỏi đó đi và Tạo lại. Bạn vẫn có thể Sửa thông tin Audio/Image/Passage của nhóm.
         </p>
@@ -132,7 +166,14 @@ const AdminQuestionManagePage = () => {
         // ================= FLAT LAYOUT (GRAMMAR, PART 5) =================
         <>
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={handleOpenQuestionModal} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 2px 4px rgba(52,152,219,0.3)' }}>+ Thêm Câu Hỏi Đơn</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleOpenQuestionModal}
+              disabled={reachedQuestionLimit}
+              style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 2px 4px rgba(52,152,219,0.3)', opacity: reachedQuestionLimit ? 0.55 : 1, cursor: reachedQuestionLimit ? 'not-allowed' : 'pointer' }}
+            >
+              + Thêm Câu Hỏi Đơn
+            </button>
           </div>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', padding: '20px' }}>
             <DataTable 
@@ -150,7 +191,14 @@ const AdminQuestionManagePage = () => {
         // ================= GROUP LAYOUT (PART 1-4, 6-7) =================
         <>
           <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={() => handleOpenGroupModal()} style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 2px 4px rgba(52,152,219,0.3)' }}>+ Thêm Nhóm Câu Hỏi</button>
+            <button
+              className="btn btn-primary"
+              onClick={() => handleOpenGroupModal()}
+              disabled={reachedQuestionLimit}
+              style={{ padding: '10px 20px', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 2px 4px rgba(52,152,219,0.3)', opacity: reachedQuestionLimit ? 0.55 : 1, cursor: reachedQuestionLimit ? 'not-allowed' : 'pointer' }}
+            >
+              + Thêm Nhóm Câu Hỏi
+            </button>
           </div>
           
           {(exercise.questionGroups || []).map((group, idx) => (

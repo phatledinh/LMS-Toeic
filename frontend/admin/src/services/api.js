@@ -74,13 +74,12 @@ let MOCK_DECKS = [
   { id: 2, listName: 'Advanced Grammar', description: 'Grammar', isSystem: true, flashCards: [] }
 ];
 
-// ========== Sections (real API — full tree, dùng cho trang admin) ==========
+// ========== Sections (real API - full tree, dùng cho trang admin) ==========
 export const getSections = () =>
   fetch(`${BASE_URL}/admin/courses/sections`, { headers: getAuthHeaders() }).then(handleResponse);
 
 export const getSectionBySlug = (slug) =>
   fetch(`${BASE_URL}/courses/sections/${slug}`, { headers: getAuthHeaders() }).then(handleResponse);
-
 // ========== Topics (real API) ==========
 // Backend chưa có endpoint list-topics-by-section riêng, nên lấy từ full tree
 // của getSections() (admin) rồi lọc theo sectionId.
@@ -107,13 +106,13 @@ export const getLessonById = (id) =>
   fetch(`${BASE_URL}/courses/lessons/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // ========== Exercises ==========
-export const getExercisesByTopic = (topicId) => mockResponse(MOCK_EXERCISES.filter(e => e.topicId == topicId));
-export const getExerciseDetailById = (id) => {
-    const exercise = MOCK_EXERCISES.find(e => e.id == id) || MOCK_EXERCISES[0];
-    const questions = MOCK_QUESTIONS.filter(q => q.exerciseId == id);
-    const groups = MOCK_GROUPS.filter(g => g.exerciseId == id);
-    return mockResponse({ ...exercise, questions, groups });
+export const getExercisesByTopic = async (topicId) => {
+  const topicRes = await getTopicById(topicId);
+  return { data: topicRes.data?.exercises || [] };
 };
+
+export const getExerciseDetailById = (id) =>
+  fetch(`${BASE_URL}/exercises/${id}`, { headers: getAuthHeaders() }).then(handleResponse);
 
 // ========== Admin: Sections (real API) ==========
 export const adminCreateSection = (data) =>
@@ -142,6 +141,7 @@ export const adminUpdateTopic = (id, data, sectionId) =>
   fetch(`${BASE_URL}/admin/courses/topics/${id}`, {
     method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ ...data, sectionId: Number(sectionId) }),
   }).then(handleResponse);
+  }).then(handleResponse);
 
 export const adminDeleteTopic = (id) =>
   fetch(`${BASE_URL}/admin/courses/topics/${id}`, {
@@ -149,41 +149,55 @@ export const adminDeleteTopic = (id) =>
   }).then(handleResponse);
 
 // ========== Admin: Exercises ==========
-export const adminCreateExercise = async (topicId, data) => {
-  MOCK_EXERCISES.push({ id: Date.now(), topicId, ...data });
-  return mockSuccess();
-};
-export const adminUpdateExercise = async (id, data) => {
-  MOCK_EXERCISES = MOCK_EXERCISES.map(e => e.id == id ? { ...e, ...data } : e);
-  return mockSuccess();
-};
-export const adminDeleteExercise = async (id) => {
-  MOCK_EXERCISES = MOCK_EXERCISES.filter(e => e.id != id);
-  return mockSuccess();
-};
+export const adminCreateExercise = (topicId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({
+      isActive: true,
+      totalQuestions: 0,
+      orderIndex: 1,
+      topicId: Number(topicId),
+      ...data,
+    }),
+  }).then(handleResponse);
 
-export const adminAddQuestion = async (exerciseId, data) => {
-  MOCK_QUESTIONS.push({ id: Date.now(), exerciseId, ...data });
-  return mockSuccess();
-};
-export const adminDeleteQuestion = async (questionId) => {
-  MOCK_QUESTIONS = MOCK_QUESTIONS.filter(q => q.id != questionId);
-  return mockSuccess();
-};
+export const adminUpdateExercise = (id, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({
+      isActive: true,
+      ...data,
+    }),
+  }).then(handleResponse);
+
+export const adminDeleteExercise = (id) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+export const adminAddQuestion = (exerciseId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${exerciseId}/questions`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteQuestion = (questionId) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/questions/${questionId}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Exercise Question Groups ==========
-export const adminAddQuestionGroup = async (exerciseId, data) => {
-  MOCK_GROUPS.push({ id: Date.now(), exerciseId, ...data });
-  return mockSuccess();
-}
-export const adminUpdateQuestionGroup = async (groupId, data) => {
-  MOCK_GROUPS = MOCK_GROUPS.map(g => g.id == groupId ? { ...g, ...data } : g);
-  return mockSuccess();
-}
-export const adminDeleteQuestionGroup = async (groupId) => {
-  MOCK_GROUPS = MOCK_GROUPS.filter(g => g.id != groupId);
-  return mockSuccess();
-}
+export const adminAddQuestionGroup = (exerciseId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/${exerciseId}/question-groups`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminUpdateQuestionGroup = (groupId, data) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/question-groups/${groupId}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminDeleteQuestionGroup = (groupId) =>
+  fetch(`${BASE_URL}/admin/courses/exercises/question-groups/${groupId}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
 
 // ========== Admin: Lessons (real API) ==========
 // topicId luôn được truyền kèm (kể cả update) vì LessonRequest yêu cầu bắt buộc.
@@ -288,5 +302,31 @@ export const adminUpdateSystemFlashcard = (id, data) =>
 
 export const adminDeleteSystemFlashcard = (id) =>
   fetch(`${BASE_URL}/admin/flashcards/${id}`, {
+    method: 'DELETE', headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+// ========== Admin: Users ==========
+export const adminGetUsers = () =>
+  fetch(`${BASE_URL}/admin/users`, {
+    headers: getAuthHeaders(),
+  }).then(handleResponse);
+
+export const adminCreateUser = (data) =>
+  fetch(`${BASE_URL}/admin/users`, {
+    method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminUpdateUser = (id, data) =>
+  fetch(`${BASE_URL}/admin/users/${id}`, {
+    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+  }).then(handleResponse);
+
+export const adminSetUserActive = (id, isActive) =>
+  fetch(`${BASE_URL}/admin/users/${id}/active`, {
+    method: 'PATCH', headers: getAuthHeaders(), body: JSON.stringify({ isActive }),
+  }).then(handleResponse);
+
+export const adminDeleteUser = (id) =>
+  fetch(`${BASE_URL}/admin/users/${id}`, {
     method: 'DELETE', headers: getAuthHeaders(),
   }).then(handleResponse);

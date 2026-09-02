@@ -100,9 +100,15 @@ const AdminCourseManagePage = () => {
   const openTopicModal = (topic = null) => {
     setEditingItem(topic);
     if (topic) {
-      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0, isActive: topic.isActive !== false });
+  const openTopicModal = (topic = null) => {
+    setEditingItem(topic);
+    if (topic) {
+      setFormData({ title: topic.title, description: topic.description || '', slug: topic.slug || '', orderIndex: topic.orderIndex || 0, isActive: topic.isActive !== false, sectionId: selectedSection.id });
     } else {
-      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true });
+      setFormData({ title: '', description: '', slug: '', orderIndex: 0, isActive: true, sectionId: selectedSection.id });
+    }
+    setIsTopicModalOpen(true);
+  };
     }
     setIsTopicModalOpen(true);
   };
