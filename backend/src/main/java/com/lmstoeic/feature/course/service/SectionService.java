@@ -114,6 +114,7 @@ public class SectionService {
                 .slug(section.getSlug())
                 .description(section.getDescription())
                 .orderIndex(section.getOrderIndex())
+                .isActive(section.getIsActive())
                 .build();
     }
 
@@ -136,6 +137,7 @@ public class SectionService {
                 .slug(topic.getSlug())
                 .description(topic.getDescription())
                 .orderIndex(topic.getOrderIndex())
+                .isActive(topic.getIsActive())
                 .build();
 
         if (topic.getLessons() != null) {

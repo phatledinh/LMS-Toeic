@@ -15,31 +15,31 @@ const Login = () => {
     e.preventDefault();
     setError('');
 
-    try {
-      const res = await fetch(`${BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
+  try {
+    const res = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || 'Đăng nhập thất bại');
-      }
-
-      const authData = data.data;
-      const userData = authData.user || authData;
-      const role = userData.role || userData.roles?.[0];
-
-      if (role !== 'ADMIN') {
-        throw new Error('Tài khoản này không có quyền admin');
-      }
-
-      login(authData.accessToken || authData.token, userData);
-      navigate('/admin/courses');
-    } catch (err) {
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
+    if (!res.ok) {
+      throw new Error(data.message || 'Đăng nhập thất bại');
     }
+
+    const authData = data.data;
+    const userData = authData.user || authData;
+    const role = userData.role || userData.roles?.[0];
+
+    if (role !== 'ADMIN') {
+      throw new Error('Tài khoản này không có quyền admin');
+    }
+
+    login(authData.accessToken || authData.token, userData);
+    navigate('/admin/courses');
+  } catch (err) {
+    setError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại!');
+  }
   };
 
   return (
